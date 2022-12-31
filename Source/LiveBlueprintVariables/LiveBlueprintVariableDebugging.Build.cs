@@ -2,9 +2,9 @@
 
 using UnrealBuildTool;
 
-public class LiveBlueprintVariables : ModuleRules
+public class LiveBlueprintVariableDebugging : ModuleRules
 {
-	public LiveBlueprintVariables(ReadOnlyTargetRules Target) : base(Target)
+	public LiveBlueprintVariableDebugging(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 		
