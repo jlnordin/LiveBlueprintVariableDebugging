@@ -410,13 +410,7 @@ uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Co
 
 	if (Property->PropertyFlags & CPF_HasGetValueTypeHash)
 	{
-		//void* ValueAsVoidPointer = AnsiMalloc(Property->GetSize(), Property->GetMinAlignment());
-		//check(ValueAsVoidPointer != nullptr);
-		//Property->ContainerPtrToValuePtr()
-		//Property->GetSingleValue_InContainer(Container, ValueAsVoidPointer, 0);
 		ValueHash = Property->GetValueTypeHash(Property->ContainerPtrToValuePtr<void>(Container));
-
-		//AnsiFree(ValueAsVoidPointer);
 	}
 
 	return ValueHash;
