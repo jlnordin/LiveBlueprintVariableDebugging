@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "LiveBlueprintVariables",
+	"Description": "An editor window that shows a summary of the currently selected actor's blueprint variables.",
+	"Category": "Other",
+	"CreatedBy": "Justin Nordin",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": false,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "LiveBlueprintVariables",
+			"Type": "Editor",
+			"LoadingPhase": "Default"
+		}
+	]
+}
