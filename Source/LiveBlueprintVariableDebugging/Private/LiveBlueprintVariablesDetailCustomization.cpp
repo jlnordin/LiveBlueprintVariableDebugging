@@ -6,6 +6,7 @@
 #include "IDetailGroup.h"
 #include "Brushes/SlateColorBrush.h"
 #include "LiveBlueprintVariables.h"
+#include "LiveBlueprintVariablesSettings.h"
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "FLiveBlueprintVariablesModule"
@@ -29,12 +30,15 @@ TUniquePtr<FLiveBlueprintVariablesDetailCustomization> FLiveBlueprintVariablesDe
         return nullptr;
     }
 
-	if (Actor->GetWorld()->WorldType != EWorldType::PIE)
+	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
+
+	if ((Settings->WhenToShowVariables == EShowBlueprintVariables::OnlyWhenPlayingOrSimulating) &&
+		(Actor->GetWorld()->WorldType != EWorldType::PIE))
 	{
 		UE_LOG(
 			LogLiveBlueprintVariables,
 			Verbose,
-			TEXT("Live Blueprint Variables only supported when playing or simulating in the editor."));
+			TEXT("Live Blueprint Variables configured to only show when playing or simulating in the editor."));
 
 		return nullptr;
 	}
@@ -109,6 +113,8 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 		TEXT("Customizing Actor '%s'..."),
 		*Actor->GetName());
 
+	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
+
 	// Categorize and sort the properties associated with this Blueprint class.
 	TMap<FString, TArray<FProperty*>> PropertiesByCategory;
 
@@ -130,6 +136,16 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 		for (FProperty* Property = Class->PropertyLink; Property != LastClassProperty; Property = Property->PropertyLinkNext)
 		{
 			if (EnumHasAnyFlags(Property->PropertyFlags, CPF_Transient | CPF_OutParm))
+			{
+				continue;
+			}
+
+			auto MetaDataMap = Property->GetMetaDataMap();
+			const bool bHiddenImplementationVariable =
+				(MetaDataMap == nullptr) ||
+				!MetaDataMap->Contains(FName("Category"));
+
+			if (bHiddenImplementationVariable && !Settings->bShowHiddenImplementationVariables)
 			{
 				continue;
 			}
@@ -317,15 +333,20 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRowValue(
 		LiveBlueprintWidgetRow.LastUpdateTimeInSeconds = RealTimeInSeconds;
 	}
 
-	double TimeSincePropertyChanged = (RealTimeInSeconds - LiveBlueprintWidgetRow.LastUpdateTimeInSeconds);
-	if (TimeSincePropertyChanged <= 2.0)
-	{
-		FLinearColor BackgroundColor = FLinearColor::LerpUsingHSV(
-			FLinearColor::Green,
-			FLinearColor::Transparent,
-			static_cast<float>(std::clamp(TimeSincePropertyChanged, 0.0, 1.0)));
+	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
 
-		Border.SetBorderBackgroundColor(BackgroundColor);
+	if (Settings->bHighlightValuesThatHaveChanged)
+	{
+		double TimeSincePropertyChanged = (RealTimeInSeconds - LiveBlueprintWidgetRow.LastUpdateTimeInSeconds);
+		if (TimeSincePropertyChanged <= 2.0)
+		{
+			FLinearColor BackgroundColor = FLinearColor::LerpUsingHSV(
+				FLinearColor::Green,
+				FLinearColor::Transparent,
+				static_cast<float>(std::clamp(TimeSincePropertyChanged, 0.0, 1.0)));
+
+			Border.SetBorderBackgroundColor(BackgroundColor);
+		}
 	}
 }
 
