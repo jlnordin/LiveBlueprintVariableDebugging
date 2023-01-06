@@ -10,7 +10,7 @@ public class LiveBlueprintVariableDebugging : ModuleRules
 		
 		PublicIncludePaths.AddRange(
 			new string[] {
-                "Editor/PropertyEditor"
+                "Editor/PropertyEditor",
 			}
 			);
 
@@ -36,7 +36,10 @@ public class LiveBlueprintVariableDebugging : ModuleRules
 				"Slate",
 				"SlateCore",
                 "DetailCustomizations",
-				"DeveloperSettings"
+				"DeveloperSettings",
+				"EditorWidgets",
+				"Kismet",
+				"KismetWidgets",
 			}
 			);
 		

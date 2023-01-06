@@ -47,7 +47,7 @@ public:
 public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
-		EShowBlueprintVariables WhenToShowVariables = EShowBlueprintVariables::OnlyWhenPlayingOrSimulating;
+	EShowBlueprintVariables WhenToShowVariables = EShowBlueprintVariables::OnlyWhenPlayingOrSimulating;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
 	bool bHighlightValuesThatHaveChanged = true;

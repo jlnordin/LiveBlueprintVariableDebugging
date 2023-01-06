@@ -44,4 +44,6 @@ private:
 	TWeakObjectPtr<AActor> Actor;
 	TArray<FLiveBlueprintWidgetRow> WidgetRows;
 	FTimerHandle UpdateTimerHandle;
+	TSharedPtr<class SKismetDebugTreeView> DebugTreeWidget;
+	TSharedPtr<class FDebugLineItem> RootDebugTreeItem;
 };

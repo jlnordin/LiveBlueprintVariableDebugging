@@ -5,6 +5,7 @@
 #include "DetailWidgetRow.h"
 #include "IDetailGroup.h"
 #include "Brushes/SlateColorBrush.h"
+#include "Debugging/SKismetDebugTreeView.h"
 #include "LiveBlueprintVariables.h"
 #include "LiveBlueprintVariablesSettings.h"
 #include "Widgets/Text/STextBlock.h"
@@ -118,6 +119,21 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 	// Categorize and sort the properties associated with this Blueprint class.
 	TMap<FString, TArray<FProperty*>> PropertiesByCategory;
 
+#if 0
+	for (TFieldIterator<FProperty> It(Object->GetClass()); It; ++It)
+	{
+		TSharedPtr<FPropertyInstanceInfo> DebugInfo;
+		FProperty* Property = *It;
+		if (Property->HasAllPropertyFlags(CPF_BlueprintVisible))
+		{
+			//void* Value = Property->ContainerPtrToValuePtr<void*>(Object);
+			//FKismetDebugUtilities::GetDebugInfoInternal(DebugInfo, Property, Value);
+
+			//EnsureChildIsAdded(OutChildren, FWatchChildLineItem(DebugInfo.ToSharedRef(), AsShared()), InSearchString, bRespectSearch);
+		}
+	}
+#endif 
+
 	for (UClass* Class = Actor->GetClass(); Class != nullptr; Class = Class->GetSuperClass())
 	{
 		if (Class->ClassGeneratedBy == nullptr)
@@ -158,6 +174,49 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	TSharedRef<FPropertySection> BlueprintSection = PropertyModule.FindOrCreateSection("Actor", "Blueprint", LOCTEXT("BlueprintSection", "Blueprint"));
 
+	FName CategoryName = FName("Debug Tree View");
+	if (!BlueprintSection->HasAddedCategory(CategoryName))
+	{
+		BlueprintSection->AddCategory(CategoryName);
+	}
+
+	IDetailCategoryBuilder& BlueprintCategory = LayoutBuilder.EditCategory(CategoryName);
+
+	BlueprintCategory.AddCustomRow(FText::FromString("Debug Tree View"), false)
+		.NameContent()
+		[
+			SNew(STextBlock)
+			.Text(FText::FromString("Debug View"))
+			.Font(IDetailLayoutBuilder::GetDetailFont())
+		]
+		.ValueContent()
+		[
+			SAssignNew(DebugTreeWidget, SKismetDebugTreeView)
+				//.OnContextMenuOpening
+				//.OnExpansionChanged(this, &SPinValueInspector::OnExpansionChanged)
+				.HeaderRow
+				(
+					SNew(SHeaderRow)
+					.Visibility(EVisibility::Collapsed)
+					+ SHeaderRow::Column(SKismetDebugTreeView::ColumnId_Name)
+					+ SHeaderRow::Column(SKismetDebugTreeView::ColumnId_Value)
+				)
+		];
+
+	RootDebugTreeItem = SKismetDebugTreeView::MakeParentItem(Actor.Get());
+	TArray<FDebugTreeItemPtr> Children;
+	RootDebugTreeItem->GatherChildrenBase(Children, FString());
+	FDebugTreeItemPtr SelfNode = Children[0];
+
+	Children.Reset();
+	SelfNode->GatherChildrenBase(Children, FString());
+	for (const auto& Child : Children)
+	{
+		DebugTreeWidget->AddTreeItemUnique(Child);
+	}
+
+#if 0
+
 	// Add widgets for all of the categories and properties.
 	for (auto& [CategoryString, PropertyArray] : PropertiesByCategory)
 	{
@@ -187,7 +246,7 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 				const bool bAdvancedDisplay =
 					EnumHasAnyFlags(Property->PropertyFlags, CPF_AdvancedDisplay) ||
 					(CategoryString == c_PrivateCategoryName);
-
+				
 				FLiveBlueprintWidgetRow NewRow = {
 					&(BlueprintCategory.AddCustomRow(Property->GetDisplayNameText(), bAdvancedDisplay)),
 					Actor.Get(),
@@ -211,6 +270,7 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 		},
 		c_PropertyRefreshPeriodInSeconds,
 		true);
+#endif
 }
 
 FLiveBlueprintVariablesDetailCustomization::~FLiveBlueprintVariablesDetailCustomization()
