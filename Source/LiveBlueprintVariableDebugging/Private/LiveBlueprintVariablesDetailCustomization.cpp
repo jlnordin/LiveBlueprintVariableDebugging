@@ -6,6 +6,7 @@
 #include "IDetailGroup.h"
 #include "Brushes/SlateColorBrush.h"
 #include "Debugging/SKismetDebugTreeView.h"
+#include "Kismet2/KismetDebugUtilities.h"
 #include "LiveBlueprintVariables.h"
 #include "LiveBlueprintVariablesSettings.h"
 #include "Widgets/Text/STextBlock.h"
@@ -117,108 +118,42 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
 
 	// Categorize and sort the properties associated with this Blueprint class.
-	TMap<FString, TArray<FProperty*>> PropertiesByCategory;
+	TArray<FDebugTreeItemPtr> DebugTreeItems = 
+		GetActorBlueprintPropertiesAsDebugTreeItemPtrs(Actor.Get());
 
-#if 0
-	for (TFieldIterator<FProperty> It(Object->GetClass()); It; ++It)
+	struct PropertyDebugItemPair
 	{
-		TSharedPtr<FPropertyInstanceInfo> DebugInfo;
-		FProperty* Property = *It;
+		TSharedPtr<FPropertyInstanceInfo> PropertyInstanceInfo;
+		FDebugTreeItemPtr DebugItem;
+	};
+	TMap<FString, TArray<PropertyDebugItemPair>> PropertiesByCategory;
+
+	int32 DebugTreeItemIndex = 0;
+	TFieldIterator<FProperty> Iterator{ Actor->GetClass() };
+	while ((Iterator != nullptr) && (DebugTreeItemIndex < DebugTreeItems.Num()))
+	{
+		FProperty* Property = *Iterator;
+
 		if (Property->HasAllPropertyFlags(CPF_BlueprintVisible))
 		{
-			//void* Value = Property->ContainerPtrToValuePtr<void*>(Object);
-			//FKismetDebugUtilities::GetDebugInfoInternal(DebugInfo, Property, Value);
+			PropertiesByCategory.FindOrAdd(GetPropertyCategoryString(Property)).Add(
+				{ 
+					GetPropertyInstanceInfo(Actor.Get(), Property), 
+					DebugTreeItems[DebugTreeItemIndex]
+				});
 
-			//EnsureChildIsAdded(OutChildren, FWatchChildLineItem(DebugInfo.ToSharedRef(), AsShared()), InSearchString, bRespectSearch);
-		}
-	}
-#endif 
-
-	for (UClass* Class = Actor->GetClass(); Class != nullptr; Class = Class->GetSuperClass())
-	{
-		if (Class->ClassGeneratedBy == nullptr)
-		{
-			// Only add details for Blueprint-generated classes.
-			continue;
+			++DebugTreeItemIndex;
 		}
 
-		UE_LOG(
-			LogLiveBlueprintVariables,
-			Verbose,
-			TEXT("  Class: '%s'"),
-			*Class->GetName());
-
-		FProperty* LastClassProperty = (Class->GetSuperClass() != nullptr) ? Class->GetSuperClass()->PropertyLink : nullptr;
-		for (FProperty* Property = Class->PropertyLink; Property != LastClassProperty; Property = Property->PropertyLinkNext)
-		{
-			if (EnumHasAnyFlags(Property->PropertyFlags, CPF_Transient | CPF_OutParm))
-			{
-				continue;
-			}
-
-			auto MetaDataMap = Property->GetMetaDataMap();
-			const bool bHiddenImplementationVariable =
-				(MetaDataMap == nullptr) ||
-				!MetaDataMap->Contains(FName("Category"));
-
-			if (bHiddenImplementationVariable && !Settings->bShowHiddenImplementationVariables)
-			{
-				continue;
-			}
-
-			PropertiesByCategory.FindOrAdd(GetPropertyCategoryString(Property)).Add(Property);
-		}
+		++Iterator;
 	}
 
 	// Add the Blueprint details section.
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	TSharedRef<FPropertySection> BlueprintSection = PropertyModule.FindOrCreateSection("Actor", "Blueprint", LOCTEXT("BlueprintSection", "Blueprint"));
 
-	FName CategoryName = FName("Debug Tree View");
-	if (!BlueprintSection->HasAddedCategory(CategoryName))
-	{
-		BlueprintSection->AddCategory(CategoryName);
-	}
-
-	IDetailCategoryBuilder& BlueprintCategory = LayoutBuilder.EditCategory(CategoryName);
-
-	BlueprintCategory.AddCustomRow(FText::FromString("Debug Tree View"), false)
-		.NameContent()
-		[
-			SNew(STextBlock)
-			.Text(FText::FromString("Debug View"))
-			.Font(IDetailLayoutBuilder::GetDetailFont())
-		]
-		.ValueContent()
-		[
-			SAssignNew(DebugTreeWidget, SKismetDebugTreeView)
-				//.OnContextMenuOpening
-				//.OnExpansionChanged(this, &SPinValueInspector::OnExpansionChanged)
-				.HeaderRow
-				(
-					SNew(SHeaderRow)
-					.Visibility(EVisibility::Collapsed)
-					+ SHeaderRow::Column(SKismetDebugTreeView::ColumnId_Name)
-					+ SHeaderRow::Column(SKismetDebugTreeView::ColumnId_Value)
-				)
-		];
-
-	RootDebugTreeItem = SKismetDebugTreeView::MakeParentItem(Actor.Get());
-	TArray<FDebugTreeItemPtr> Children;
-	RootDebugTreeItem->GatherChildrenBase(Children, FString());
-	FDebugTreeItemPtr SelfNode = Children[0];
-
-	Children.Reset();
-	SelfNode->GatherChildrenBase(Children, FString());
-	for (const auto& Child : Children)
-	{
-		DebugTreeWidget->AddTreeItemUnique(Child);
-	}
-
-#if 0
-
 	// Add widgets for all of the categories and properties.
-	for (auto& [CategoryString, PropertyArray] : PropertiesByCategory)
+	for (auto& [CategoryString, PropertyAndDebugItemArray] : PropertiesByCategory)
 	{
 		FName CategoryName = *FString::Printf(TEXT("Blueprint Properties - %s"), *CategoryString);
 
@@ -229,38 +164,42 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 
 		IDetailCategoryBuilder& BlueprintCategory = LayoutBuilder.EditCategory(CategoryName);
 
-		for (auto& Property : PropertyArray)
+		for (auto& [PropertyInstanceInfo, DebugItem] : PropertyAndDebugItemArray)
 		{
-			if (FStructProperty* StructProperty = CastField<FStructProperty>(Property); StructProperty != nullptr)
+			if (ShouldExpandProperty(PropertyInstanceInfo))
 			{
-				IDetailGroup& StructGroup = BlueprintCategory.AddGroup(
-					StructProperty->GetFName(),
-					FText::FromString(StructProperty->GetName()),
-					false,
-					true);
-
-				ExpandStructProperty(StructProperty, &StructGroup, Actor.Get());
+				ExpandPropertyChildren(
+					DebugItem,
+					BlueprintCategory.AddGroup(
+						PropertyInstanceInfo->Property->GetFName(), 
+						PropertyInstanceInfo->DisplayName),
+					PropertyInstanceInfo,
+					Actor.Get());
 			}
 			else
 			{
 				const bool bAdvancedDisplay =
-					EnumHasAnyFlags(Property->PropertyFlags, CPF_AdvancedDisplay) ||
+					PropertyInstanceInfo->Property->HasAnyPropertyFlags(CPF_AdvancedDisplay) ||
 					(CategoryString == c_PrivateCategoryName);
-				
-				FLiveBlueprintWidgetRow NewRow = {
-					&(BlueprintCategory.AddCustomRow(Property->GetDisplayNameText(), bAdvancedDisplay)),
+
+				FLiveBlueprintWidgetRowData NewRowData = {
+					DebugItem,
 					Actor.Get(),
-					Property,
+					PropertyInstanceInfo,
 					0,
 					0
 				};
 
-				WidgetRows.Add(NewRow);
-				FillInWidgetRow(NewRow);
+				FillInWidgetRow(
+					BlueprintCategory.AddCustomRow(PropertyInstanceInfo->Property->GetDisplayNameText(), bAdvancedDisplay),
+					NewRowData);
+
+				WidgetRows.Add(NewRowData);
 			}
 		}
 	}
 
+#if 0
 	// Register a timer to keep our values up-to-date.
 	Actor->GetWorldTimerManager().SetTimer(
 		UpdateTimerHandle,
@@ -296,108 +235,160 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateBlueprintDetails()
 	}
 }
 
-void FLiveBlueprintVariablesDetailCustomization::ExpandStructProperty(
-    FStructProperty* StructProperty, 
-    IDetailGroup* StructGroup, 
-    void* Container)
+void FLiveBlueprintVariablesDetailCustomization::ExpandPropertyChildren(
+	FDebugTreeItemPtr DebugItem,
+	IDetailGroup& Group,
+	TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo,
+	void* Container)
 {
-    for (FProperty* InnerProperty = StructProperty->Struct->PropertyLink; InnerProperty != nullptr; InnerProperty = InnerProperty->PropertyLinkNext)
-    {
-        if (FStructProperty* StructSubProperty = CastField<FStructProperty>(InnerProperty); StructSubProperty != nullptr)
-        {
-            IDetailGroup& StructSubGroup = StructGroup->AddGroup(
-                StructSubProperty->GetFName(),
-                FText::FromString(StructSubProperty->GetName()),
-                true);
+	// Fill in the group's header row.
+	FLiveBlueprintWidgetRowData HeaderRowData = {
+		DebugItem,
+		Container,
+		PropertyInstanceInfo,
+		0,
+		0};
 
-            ExpandStructProperty(StructSubProperty, &StructSubGroup, StructProperty->ContainerPtrToValuePtr<void>(Container));
+	FillInWidgetRow(Group.HeaderRow(), HeaderRowData);
+	WidgetRows.Add(HeaderRowData);
+
+	// Now add the children to the group as widget rows.
+	TArray<FDebugTreeItemPtr> Children;
+	DebugItem->GatherChildrenBase(Children, FString());
+
+	for (
+		int32 ChildDebugIndex = 0, ChildPropertyIndex = 0;
+		ChildDebugIndex < Children.Num() && ChildPropertyIndex < PropertyInstanceInfo->Children.Num();
+		ChildDebugIndex++, ChildPropertyIndex++)
+	{
+		auto& ChildDebugItem = Children[ChildDebugIndex];
+		auto& ChildPropertyInfo = PropertyInstanceInfo->Children[ChildPropertyIndex];
+
+        if (ShouldExpandProperty(ChildPropertyInfo))
+        {
+            IDetailGroup& SubGroup = Group.AddGroup(
+				ChildPropertyInfo->Property->GetFName(),
+				ChildPropertyInfo->DisplayName,
+                false);
+
+			ExpandPropertyChildren(
+				ChildDebugItem,
+				SubGroup,
+				ChildPropertyInfo,
+				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container));
         }
         else
         {
-			FLiveBlueprintWidgetRow NewRow = {
-				&(StructGroup->AddWidgetRow()),
-				StructProperty->ContainerPtrToValuePtr<void>(Container),
-				InnerProperty,
+			FLiveBlueprintWidgetRowData NewRowData = {
+				ChildDebugItem,
+				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container),
+				ChildPropertyInfo,
 				0,
 				0
 			};
-
-			WidgetRows.Add(NewRow);
-			FillInWidgetRow(NewRow);
+			
+			FillInWidgetRow(Group.AddWidgetRow(), NewRowData);
+			WidgetRows.Add(NewRowData);
         }
     }
 }
 
 void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
-	FLiveBlueprintWidgetRow& LiveBlueprintWidgetRow)
+	FDetailWidgetRow& WidgetRow,
+	FLiveBlueprintWidgetRowData& WidgetRowData)
 {
-	LiveBlueprintWidgetRow.ValueHash = GetPropertyValueHash(LiveBlueprintWidgetRow.Container,
-		LiveBlueprintWidgetRow.Property);
-
-    FString ValueString = GetPropertyValueString(
-		LiveBlueprintWidgetRow.Container, 
-		LiveBlueprintWidgetRow.Property);
+	/*WidgetRowData.ValueHash = GetPropertyValueHash(
+		WidgetRowData.Container,
+		WidgetRowData.Property);*/
 
     UE_LOG(
         LogLiveBlueprintVariables,
 		Verbose,
-        TEXT("  Property: '%s' [%s] \tFlags: 0x%08X\tValue: %s"),
-        *LiveBlueprintWidgetRow.Property->GetName(),
-        *LiveBlueprintWidgetRow.Property->GetClass()->GetName(),
-		LiveBlueprintWidgetRow.Property->GetPropertyFlags(),
-        *ValueString);
+        TEXT("  Property: '%s' [%s] \tFlags: 0x%08X\tHash: %i"),
+        *WidgetRowData.PropertyInstanceInfo->Property->GetName(),
+        *WidgetRowData.PropertyInstanceInfo->Property->GetClass()->GetName(),
+		WidgetRowData.PropertyInstanceInfo->Property->GetPropertyFlags(),
+		WidgetRowData.ValueHash);
 
-	LiveBlueprintWidgetRow.WidgetRow
-        ->NameContent()
-        [
-            SNew(STextBlock)
-            .Text(LiveBlueprintWidgetRow.Property->GetDisplayNameText())
-            .Font(IDetailLayoutBuilder::GetDetailFont())
-        ]
-        .ValueContent()
-        [
-			SNew(SBorder)
+	WidgetRow
+		.NameContent()
+		[
+			SNew(SHorizontalBox)
+			
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			[
+				WidgetRowData.DebugItem->GetNameIcon()
+			]
+			
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			.Padding(5.f, 0.f, 0.f, 0.f)
+			[
+				WidgetRowData.DebugItem->GenerateNameWidget(MakeShared<FString>())
+			]
+		]
+		.ValueContent()
+		[
+			SAssignNew(WidgetRowData.BorderWidget, SBorder)
 			.HAlign(EHorizontalAlignment::HAlign_Fill)
 			.VAlign(EVerticalAlignment::VAlign_Fill)
 			.BorderBackgroundColor(FColor::Transparent)
 			.BorderImage(&c_HighlightedBackgroundBrush)
 			.Content()
 			[
-				SNew(STextBlock)
-				.Text(FText::FromString(ValueString))
-				.Font(IDetailLayoutBuilder::GetDetailFont())
+				SNew(SHorizontalBox)
+		
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				[
+					WidgetRowData.DebugItem->GetValueIcon()
+				]
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.HAlign(HAlign_Left)
+				.Padding(.5f, 1.f)
+				[
+					WidgetRowData.DebugItem->GenerateValueWidget(MakeShared<FString>())
+				]
 			]
-        ];
+		];
 }
 
 void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRowValue(
-	FLiveBlueprintWidgetRow& LiveBlueprintWidgetRow,
+	FLiveBlueprintWidgetRowData& WidgetRowData,
 	double RealTimeInSeconds)
 {
-	SBorder& Border = static_cast<SBorder&>(LiveBlueprintWidgetRow.WidgetRow->ValueWidget.Widget.Get());
-	STextBlock& TextBlock = static_cast<STextBlock&>(Border.GetContent().Get());
+	SBorder& Border = *WidgetRowData.BorderWidget;
 
-	uint32 NewValueHash = GetPropertyValueHash(
-		LiveBlueprintWidgetRow.Container,
-		LiveBlueprintWidgetRow.Property);
+	uint32 NewValueHash = 0;
+	
+	/*GetPropertyValueHash(
+		WidgetRowData.Container,
+		WidgetRowData.Property);*/
 
-	if (NewValueHash != LiveBlueprintWidgetRow.ValueHash)
+	if (NewValueHash != WidgetRowData.ValueHash)
 	{
-		FString ValueString = GetPropertyValueString(
-			LiveBlueprintWidgetRow.Container,
-			LiveBlueprintWidgetRow.Property);
+		/*FString ValueString = GetPropertyValueString(
+			WidgetRowData.Container,
+			WidgetRowData.Property);
 		
-		TextBlock.SetText(FText::FromString(ValueString));
+		TextBlock.SetText(FText::FromString(ValueString));*/
 
-		LiveBlueprintWidgetRow.ValueHash = NewValueHash;
-		LiveBlueprintWidgetRow.LastUpdateTimeInSeconds = RealTimeInSeconds;
+		WidgetRowData.ValueHash = NewValueHash;
+		WidgetRowData.LastUpdateTimeInSeconds = RealTimeInSeconds;
 	}
 
 	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
 
 	if (Settings->bHighlightValuesThatHaveChanged)
 	{
-		double TimeSincePropertyChanged = (RealTimeInSeconds - LiveBlueprintWidgetRow.LastUpdateTimeInSeconds);
+		double TimeSincePropertyChanged = (RealTimeInSeconds - WidgetRowData.LastUpdateTimeInSeconds);
 		if (TimeSincePropertyChanged <= 2.0)
 		{
 			FLinearColor BackgroundColor = FLinearColor::LerpUsingHSV(
@@ -485,7 +476,7 @@ FString FLiveBlueprintVariablesDetailCustomization::GetPropertyValueString(void*
     return ValueString;
 }
 
-uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Container, FProperty* Property)
+uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Container, const FProperty* Property)
 {
 	uint32 ValueHash = 0;
 
@@ -495,4 +486,44 @@ uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Co
 	}
 
 	return ValueHash;
+}
+
+TArray<FDebugTreeItemPtr> FLiveBlueprintVariablesDetailCustomization::GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor)
+{
+	TArray<FDebugTreeItemPtr> PropertyDebugTreeItems;
+
+	FDebugTreeItemPtr RootDebugTreeItem = SKismetDebugTreeView::MakeParentItem(Actor);
+	RootDebugTreeItem->GatherChildrenBase(PropertyDebugTreeItems, FString());
+	FDebugTreeItemPtr SelfNode = PropertyDebugTreeItems[0];
+
+	PropertyDebugTreeItems.Reset();
+	SelfNode->GatherChildrenBase(PropertyDebugTreeItems, FString());
+
+	return PropertyDebugTreeItems;
+}
+
+TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintVariablesDetailCustomization::GetPropertyInstanceInfo(void* Container, const FProperty* Property)
+{
+	TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
+	FKismetDebugUtilities::GetDebugInfoInternal(
+		InstanceInfo,
+		Property,
+		Property->ContainerPtrToValuePtr<void>(Container));
+
+	return InstanceInfo;
+}
+
+bool FLiveBlueprintVariablesDetailCustomization::ShouldExpandProperty(TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+{
+	return (
+		!PropertyInstanceInfo->Children.IsEmpty() &&
+		PropertyInstanceInfo->Property->HasAllPropertyFlags(
+			CPF_BlueprintVisible) &&
+		!PropertyInstanceInfo->Property->HasAnyPropertyFlags(
+			CPF_UObjectWrapper | 
+			CPF_InstancedReference |
+			CPF_ParmFlags | 
+			CPF_NativeAccessSpecifiers |
+			CPF_DisableEditOnTemplate |
+			CPF_DisableEditOnInstance));
 }

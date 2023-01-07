@@ -3,13 +3,14 @@
 #include "CoreMinimal.h"
 #include "IDetailCustomization.h"
 
-struct FLiveBlueprintWidgetRow
+struct FLiveBlueprintWidgetRowData
 {
-	FDetailWidgetRow* WidgetRow = nullptr;
+	TSharedPtr<class FDebugLineItem> DebugItem;
 	void* Container = nullptr;
-	FProperty* Property = nullptr;
+	TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo;
 	double LastUpdateTimeInSeconds = 0.0;
 	uint32 ValueHash = 0;
+	TSharedPtr<class SBorder> BorderWidget;
 };
 
 /**
@@ -33,16 +34,23 @@ public:
 private:
 	void UpdateBlueprintDetails();
 
-	void ExpandStructProperty(FStructProperty* StructProperty, class IDetailGroup* StructGroup, void* Container);
+	void ExpandPropertyChildren(
+		TSharedPtr<class FDebugLineItem> DebugItem, 
+		class IDetailGroup& Group, 
+		TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo,
+		void* Container);
 	
-	static void FillInWidgetRow(FLiveBlueprintWidgetRow& LiveBlueprintWidgetRow);
-	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRow& LiveBlueprintWidgetRow, double RealTimeInSeconds);
+	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData);
+	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);
 	static FString GetPropertyCategoryString(FProperty* Property);
 	static FString GetPropertyValueString(void* Container, FProperty* Property);
-	static uint32 GetPropertyValueHash(void* Container, FProperty* Property);
+	static uint32 GetPropertyValueHash(void* Container, const FProperty* Property);
+	static TArray<TSharedPtr<class FDebugLineItem>> GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor);
+	static TSharedPtr<struct FPropertyInstanceInfo> GetPropertyInstanceInfo(void* Container, const FProperty* Property);
+	static bool ShouldExpandProperty(TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 
 	TWeakObjectPtr<AActor> Actor;
-	TArray<FLiveBlueprintWidgetRow> WidgetRows;
+	TArray<FLiveBlueprintWidgetRowData> WidgetRows;
 	FTimerHandle UpdateTimerHandle;
 	TSharedPtr<class SKismetDebugTreeView> DebugTreeWidget;
 	TSharedPtr<class FDebugLineItem> RootDebugTreeItem;
