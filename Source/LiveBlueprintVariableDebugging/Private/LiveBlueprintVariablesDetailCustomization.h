@@ -10,7 +10,8 @@ struct FLiveBlueprintWidgetRowData
 	TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo;
 	double LastUpdateTimeInSeconds = 0.0;
 	uint32 ValueHash = 0;
-	TSharedPtr<class SBorder> BorderWidget;
+	TSharedPtr<class SBorder> ValueBorderWidget;
+	TSharedPtr<class SHorizontalBox> ValueWidgetContainer;
 };
 
 /**
@@ -38,16 +39,19 @@ private:
 		TSharedPtr<class FDebugLineItem> DebugItem, 
 		class IDetailGroup& Group, 
 		TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo,
-		void* Container);
+		void* Container,
+		int LevelsOfRecursion = 0);
 	
-	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData);
-	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);
+	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData, int LogIndentation = 0);
+	static TSharedRef<class SWidget> GenerateValueWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData);
+	static void UpdateWidgetRow(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);
 	static FString GetPropertyCategoryString(FProperty* Property);
 	static FString GetPropertyValueString(void* Container, FProperty* Property);
 	static uint32 GetPropertyValueHash(void* Container, const FProperty* Property);
 	static TArray<TSharedPtr<class FDebugLineItem>> GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor);
 	static TSharedPtr<struct FPropertyInstanceInfo> GetPropertyInstanceInfo(void* Container, const FProperty* Property);
-	static bool ShouldExpandProperty(TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+	static bool ShouldExpandProperty(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 
 	TWeakObjectPtr<AActor> Actor;
 	TArray<FLiveBlueprintWidgetRowData> WidgetRows;
