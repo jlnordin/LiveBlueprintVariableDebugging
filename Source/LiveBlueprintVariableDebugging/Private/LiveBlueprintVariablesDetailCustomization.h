@@ -43,6 +43,7 @@ private:
 		int LevelsOfRecursion = 0);
 	
 	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData, int LogIndentation = 0);
+	static TSharedRef<class SWidget> GenerateNameIcon(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 	static TSharedRef<class SWidget> GenerateValueWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData);
 	static void UpdateWidgetRow(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);

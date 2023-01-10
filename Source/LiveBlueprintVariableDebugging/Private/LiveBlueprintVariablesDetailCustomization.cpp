@@ -1,5 +1,6 @@
 #include "LiveBlueprintVariablesDetailCustomization.h"
 
+#include "BlueprintEditor.h"
 #include "DetailCategoryBuilder.h"
 #include "DetailLayoutBuilder.h"
 #include "DetailWidgetRow.h"
@@ -337,7 +338,7 @@ void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
 			.HAlign(HAlign_Left)
 			.VAlign(VAlign_Center)
 			[
-				WidgetRowData.DebugItem->GetNameIcon()
+				GenerateNameIcon(WidgetRowData.PropertyInstanceInfo)
 			]
 			
 			+ SHorizontalBox::Slot()
@@ -374,6 +375,29 @@ void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
 		];
 
 	UpdateWidgetRowValue(WidgetRowData);
+}
+
+TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateNameIcon(
+	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+{
+	// Unreal 5.1 has a bug where calling FDebugLineItem::GetNameIcon will crash if the given 
+	// property falls back to the default icon. So instead of relying on this, we create our 
+	// own icon in a similar way to the Kismet / Blueprint Debugger here.
+	
+	FSlateColor BaseColor;
+	FSlateColor UnusedColor;
+	FSlateBrush const* UnusedIcon = nullptr;
+	const FSlateBrush* IconBrush = FBlueprintEditor::GetVarIconAndColorFromProperty(
+		PropertyInstanceInfo->Property.Get(),
+		BaseColor,
+		UnusedIcon,
+		UnusedColor
+	);
+
+	return SNew(SImage)
+		.Image(IconBrush)
+		.ColorAndOpacity(BaseColor)
+		.ToolTipText(PropertyInstanceInfo->Type);
 }
 
 TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateValueWidget(
