@@ -97,7 +97,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCus
         UE_LOG(
             LogLiveBlueprintVariables,
             Display,
-            TEXT("Blueprint details only support one object, but multiple objects are selected. Showing data from the first selected object."));
+            TEXT("Blueprint details only support one object."));
 
         return nullptr;
     }
@@ -142,8 +142,6 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 		Verbose,
 		TEXT("Customizing Actor '%s'..."),
 		*Actor->GetName());
-
-	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
 
 	// Categorize and sort the properties associated with this Blueprint class.
 	TArray<FDebugTreeItemPtr> DebugTreeItems = 
@@ -224,19 +222,22 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 	}
 
 	// Register a timer to keep our values up-to-date.
-	Actor->GetWorldTimerManager().SetTimer(
-		UpdateTimerHandle,
-		[this]()
-		{
-			UpdateBlueprintDetails();
-		},
-		c_PropertyRefreshPeriodInSeconds,
-		true);
+	if (Actor->GetWorld()->WorldType == EWorldType::PIE)
+	{
+		Actor->GetWorldTimerManager().SetTimer(
+			UpdateTimerHandle,
+			[this]()
+			{
+				UpdateBlueprintDetails();
+			},
+			c_PropertyRefreshPeriodInSeconds,
+			true);
+	}
 }
 
 FLiveBlueprintVariablesDetailCustomization::~FLiveBlueprintVariablesDetailCustomization()
 {
-	if (Actor.IsValid())
+	if (Actor.IsValid() && UpdateTimerHandle.IsValid())
 	{
 		Actor->GetWorldTimerManager().ClearTimer(UpdateTimerHandle);
 	}
@@ -438,8 +439,8 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRowValue(FLiveBluep
 {
 	// We have special handling for set, array, and map properties such that their immediate children 
 	// are also included in the ValueWidgetContainer. This allows the number of elements to change 
-	// dynamically without needing to add new row to the Blueprint details category, which is not 
-	// feasible after its been constructed.
+	// dynamically without needing to add a new row to the Blueprint details category, which is not 
+	// feasible after it has been constructed.
 
 	if (WidgetRowData.PropertyInstanceInfo->Property->IsA<FSetProperty>() ||
 		WidgetRowData.PropertyInstanceInfo->Property->IsA<FArrayProperty>() ||
@@ -558,66 +559,6 @@ FString FLiveBlueprintVariablesDetailCustomization::GetPropertyCategoryString(FP
     }
 
     return Category;
-}
-
-FString FLiveBlueprintVariablesDetailCustomization::GetPropertyValueString(void* Container, FProperty* Property)
-{
-    FString ValueString;
-
-    if (FFloatProperty* FloatProperty = CastField<FFloatProperty>(Property); FloatProperty != nullptr)
-    {
-        ValueString = FString::Printf(
-            TEXT("%f"),
-            FloatProperty->GetPropertyValue_InContainer(Container)); 
-    }
-    else if (FDoubleProperty* DoubleProperty = CastField<FDoubleProperty>(Property); DoubleProperty != nullptr)
-    {
-        ValueString = FString::Printf(
-            TEXT("%lf"),
-            DoubleProperty->GetPropertyValue_InContainer(Container));
-    }
-    else if (FByteProperty* ByteProperty = CastField<FByteProperty>(Property); ByteProperty != nullptr)
-    {
-        ValueString = FString::Printf(
-            TEXT("%i"),
-            ByteProperty->GetPropertyValue_InContainer(Container));
-    }
-    else if (FObjectProperty* ObjectProperty = CastField<FObjectProperty>(Property); ObjectProperty != nullptr)
-    {
-        TObjectPtr<UObject> ObjectPropertyValue = ObjectProperty->GetPropertyValue_InContainer(Container);
-
-        ValueString = FString::Printf(
-            TEXT("%s"),
-            ObjectPropertyValue != nullptr ? *(ObjectPropertyValue->GetName()) : TEXT("[nullptr]"));
-    }
-    else if (FBoolProperty* BoolProperty = CastField<FBoolProperty>(Property); BoolProperty != nullptr)
-    {
-        ValueString = FString::Printf(
-            TEXT("%s"),
-            BoolProperty->GetPropertyValue_InContainer(Container) ? TEXT("true") : TEXT("false"));
-    }
-    else if (FIntProperty* IntProperty = CastField<FIntProperty>(Property); IntProperty != nullptr)
-    {
-        ValueString = FString::Printf(
-            TEXT("%i"),
-            IntProperty->GetPropertyValue_InContainer(Container));
-    }
-    else if (FNameProperty* NameProperty = CastField<FNameProperty>(Property); NameProperty != nullptr)
-    {
-        ValueString = NameProperty->GetPropertyValue_InContainer(Container).ToString();
-    }
-    else if (FStrProperty* StrProperty = CastField<FStrProperty>(Property); StrProperty != nullptr)
-    {
-        ValueString = StrProperty->GetPropertyValue_InContainer(Container);
-    }
-    else
-    {
-        ValueString = FString::Printf(
-            TEXT("[%s]"),
-            *Property->GetClass()->GetName());
-    }
-
-    return ValueString;
 }
 
 uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Container, const FProperty* Property)

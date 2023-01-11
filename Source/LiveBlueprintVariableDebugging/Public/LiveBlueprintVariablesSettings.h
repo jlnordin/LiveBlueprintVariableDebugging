@@ -51,7 +51,4 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
 	bool bHighlightValuesThatHaveChanged = true;
-
-	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
-	bool bShowHiddenImplementationVariables = false;
 };
