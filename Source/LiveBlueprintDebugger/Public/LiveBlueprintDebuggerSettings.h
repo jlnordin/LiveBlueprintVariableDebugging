@@ -24,23 +24,23 @@ public:
 
 	virtual FName GetContainerName() const { return FName("Project"); }
 	virtual FName GetCategoryName() const { return FName("Plugins"); }
-	virtual FName GetSectionName() const { return FName("LiveBlueprintDebuggerSettings"); }
+	virtual FName GetSectionName() const { return FName("LiveBlueprintDebugger"); }
 
 	virtual FText GetSectionText() const override
 	{
-		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsName", "Live Blueprint Variable Debugging");
+		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsName", "Live Blueprint Debugger");
 	}
 
 	virtual FText GetSectionDescription() const override
 	{
-		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsDescription", "Configure the Live Blueprint Variable Debugging plugin.");
+		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsDescription", "Configure the Live Blueprint Debugger plugin.");
 	}
 
 public:
 
-	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
+	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
 	EShowBlueprintVariables WhenToShowVariables = EShowBlueprintVariables::OnlyWhenPlayingOrSimulating;
 
-	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Variable Debugging")
+	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
 	bool bHighlightValuesThatHaveChanged = true;
 };
