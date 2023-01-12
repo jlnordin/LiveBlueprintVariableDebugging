@@ -14,14 +14,6 @@ enum class EShowBlueprintVariables : uint8
 };
 
 
-UENUM()
-enum class EVariablesVisibilityFilter : uint8
-{
-	OnlyShowPublicVariables,
-	ShowPublicAndProtectedVariables
-};
-
-
 UCLASS(Config = EditorPerProjectUserSettings)
 class LIVEBLUEPRINTDEBUGGER_API ULiveBlueprintDebuggerSettings : public UDeveloperSettings
 {
