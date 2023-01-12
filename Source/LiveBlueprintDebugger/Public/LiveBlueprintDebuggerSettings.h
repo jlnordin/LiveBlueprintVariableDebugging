@@ -23,7 +23,7 @@ enum class EVariablesVisibilityFilter : uint8
 
 
 UCLASS(Config = EditorPerProjectUserSettings)
-class LIVEBLUEPRINTVARIABLEDEBUGGING_API ULiveBlueprintDebuggerSettings : public UDeveloperSettings
+class LIVEBLUEPRINTDEBUGGER_API ULiveBlueprintDebuggerSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 

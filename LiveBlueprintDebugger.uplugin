@@ -2,23 +2,24 @@
 	"FileVersion": 3,
 	"Version": 1,
 	"VersionName": "1.0",
-	"FriendlyName": "LiveBlueprintVariableDebugging",
-	"Description": "An editor window that shows a summary of the currently selected actor's blueprint variables.",
-	"Category": "Other",
+	"FriendlyName": "Live Blueprint Debugger in Actor Details",
+	"Description": "Shows a live Blueprint debugger in the actor details panel when playing or simulating in the editor.",
+	"Category": "Debugging",
 	"CreatedBy": "Justin Nordin",
-	"CreatedByURL": "",
-	"DocsURL": "",
+	"CreatedByURL": "https://github.com/jlnordin/LiveBlueprintVariableDebugging",
+	"DocsURL": "https://github.com/jlnordin/LiveBlueprintVariableDebugging/blob/main/README.md",
 	"MarketplaceURL": "",
-	"SupportURL": "",
+	"EngineVersion": "5.1.0",
 	"CanContainContent": false,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
 	"Installed": false,
 	"Modules": [
 		{
-			"Name": "LiveBlueprintVariableDebugging",
+			"Name": "LiveBlueprintDebugger",
 			"Type": "Editor",
-			"LoadingPhase": "Default"
+			"LoadingPhase": "Default",
+			"WhitelistPlatforms": [ "Win64" ]
 		}
 	]
 }
