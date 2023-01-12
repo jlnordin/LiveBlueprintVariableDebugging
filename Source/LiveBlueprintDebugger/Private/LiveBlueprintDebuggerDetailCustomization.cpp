@@ -1,4 +1,4 @@
-#include "LiveBlueprintVariablesDetailCustomization.h"
+#include "LiveBlueprintDebuggerDetailCustomization.h"
 
 #include "BlueprintEditor.h"
 #include "DetailCategoryBuilder.h"
@@ -8,11 +8,11 @@
 #include "Brushes/SlateColorBrush.h"
 #include "Debugging/SKismetDebugTreeView.h"
 #include "Kismet2/KismetDebugUtilities.h"
-#include "LiveBlueprintVariables.h"
-#include "LiveBlueprintVariablesSettings.h"
+#include "LiveBlueprintDebugger.h"
+#include "LiveBlueprintDebuggerSettings.h"
 #include "Widgets/Text/STextBlock.h"
 
-#define LOCTEXT_NAMESPACE "FLiveBlueprintVariablesModule"
+#define LOCTEXT_NAMESPACE "FLiveBlueprintDebuggerModule"
 
 struct PropertyDebugItemPair
 {
@@ -45,7 +45,7 @@ static const FString c_PrivateCategoryName = "Private Implementation Variables";
 static const float c_PropertyRefreshPeriodInSeconds = 0.1f;
 static const FSlateColorBrush c_HighlightedBackgroundBrush = FSlateColorBrush(FLinearColor(0.0f, 1.0f, 0.0f, 0.6f));
 
-TUniquePtr<FLiveBlueprintVariablesDetailCustomization> FLiveBlueprintVariablesDetailCustomization::CreateForLayoutBuilder(
+TUniquePtr<FLiveBlueprintDebuggerDetailCustomization> FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(
 	IDetailLayoutBuilder& LayoutBuilder)
 {
 	TWeakObjectPtr<AActor> Actor = GetActorToCustomize(LayoutBuilder);
@@ -60,24 +60,24 @@ TUniquePtr<FLiveBlueprintVariablesDetailCustomization> FLiveBlueprintVariablesDe
         return nullptr;
     }
 
-	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
 
 	if ((Settings->WhenToShowVariables == EShowBlueprintVariables::OnlyWhenPlayingOrSimulating) &&
 		(Actor->GetWorld()->WorldType != EWorldType::PIE))
 	{
 		UE_LOG(
-			LogLiveBlueprintVariables,
+			LogLiveBlueprintDebugger,
 			Verbose,
 			TEXT("Live Blueprint Variables configured to only show when playing or simulating in the editor."));
 
 		return nullptr;
 	}
 
-	return TUniquePtr<FLiveBlueprintVariablesDetailCustomization>(
-		new FLiveBlueprintVariablesDetailCustomization{Actor, LayoutBuilder});
+	return TUniquePtr<FLiveBlueprintDebuggerDetailCustomization>(
+		new FLiveBlueprintDebuggerDetailCustomization{Actor, LayoutBuilder});
 }
 
-TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCustomize(IDetailLayoutBuilder& LayoutBuilder)
+TWeakObjectPtr<AActor> FLiveBlueprintDebuggerDetailCustomization::GetActorToCustomize(IDetailLayoutBuilder& LayoutBuilder)
 {
     TArray<TWeakObjectPtr<UObject>> ObjectsBeingCustomized;
     LayoutBuilder.GetObjectsBeingCustomized(ObjectsBeingCustomized);
@@ -85,7 +85,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCus
     if (ObjectsBeingCustomized.IsEmpty())
     {
         UE_LOG(
-            LogLiveBlueprintVariables,
+            LogLiveBlueprintDebugger,
             Display,
             TEXT("No objects selected."));
 
@@ -95,7 +95,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCus
     if (ObjectsBeingCustomized.Num() > 1)
     {
         UE_LOG(
-            LogLiveBlueprintVariables,
+            LogLiveBlueprintDebugger,
             Display,
             TEXT("Blueprint details only support one object."));
 
@@ -107,7 +107,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCus
     if (!Object.IsValid())
     {
         UE_LOG(
-            LogLiveBlueprintVariables,
+            LogLiveBlueprintDebugger,
             Display,
             TEXT("Selected object is invalid."));
 
@@ -117,7 +117,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintVariablesDetailCustomization::GetActorToCus
     return TWeakObjectPtr<AActor>(CastChecked<AActor>(Object));
 }
 
-bool FLiveBlueprintVariablesDetailCustomization::IsAnyAncestorABlueprintClass(UClass* Class)
+bool FLiveBlueprintDebuggerDetailCustomization::IsAnyAncestorABlueprintClass(UClass* Class)
 {
 	while (Class != nullptr)
 	{
@@ -132,13 +132,13 @@ bool FLiveBlueprintVariablesDetailCustomization::IsAnyAncestorABlueprintClass(UC
 	return false;
 }
 
-FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomization(
+FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomization(
 	TWeakObjectPtr<AActor> ActorToCustomize,
 	IDetailLayoutBuilder& LayoutBuilder) :
 		Actor(ActorToCustomize)
 {
 	UE_LOG(
-		LogLiveBlueprintVariables,
+		LogLiveBlueprintDebugger,
 		Verbose,
 		TEXT("Customizing Actor '%s'..."),
 		*Actor->GetName());
@@ -235,7 +235,7 @@ FLiveBlueprintVariablesDetailCustomization::FLiveBlueprintVariablesDetailCustomi
 	}
 }
 
-FLiveBlueprintVariablesDetailCustomization::~FLiveBlueprintVariablesDetailCustomization()
+FLiveBlueprintDebuggerDetailCustomization::~FLiveBlueprintDebuggerDetailCustomization()
 {
 	if (Actor.IsValid() && UpdateTimerHandle.IsValid())
 	{
@@ -243,7 +243,7 @@ FLiveBlueprintVariablesDetailCustomization::~FLiveBlueprintVariablesDetailCustom
 	}
 }
 
-void FLiveBlueprintVariablesDetailCustomization::UpdateBlueprintDetails()
+void FLiveBlueprintDebuggerDetailCustomization::UpdateBlueprintDetails()
 {
 	if (!Actor.IsValid())
 	{
@@ -258,7 +258,7 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateBlueprintDetails()
 	}
 }
 
-void FLiveBlueprintVariablesDetailCustomization::ExpandPropertyChildren(
+void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
 	FDebugTreeItemPtr DebugItem,
 	IDetailGroup& Group,
 	TSharedPtr<FPropertyInstanceInfo> PropertyInstanceInfo,
@@ -308,7 +308,7 @@ void FLiveBlueprintVariablesDetailCustomization::ExpandPropertyChildren(
     }
 }
 
-void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
+void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 	FDetailWidgetRow& WidgetRow,
 	FLiveBlueprintWidgetRowData& WidgetRowData,
 	int LogIndentation)
@@ -320,7 +320,7 @@ void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
 	FString Indentation = std::wstring(LogIndentation, L' ').c_str();
 
     UE_LOG(
-        LogLiveBlueprintVariables,
+        LogLiveBlueprintDebugger,
 		Verbose,
         TEXT("%sProperty: '%s' [%s] \tFlags: 0x%08X\tHash: %i"),
 		*Indentation,
@@ -378,7 +378,7 @@ void FLiveBlueprintVariablesDetailCustomization::FillInWidgetRow(
 	UpdateWidgetRowValue(WidgetRowData);
 }
 
-TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateNameIcon(
+TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameIcon(
 	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
 {
 	// Unreal 5.1 has a bug where calling FDebugLineItem::GetNameIcon will crash if the given 
@@ -401,7 +401,7 @@ TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateNameIcon
 		.ToolTipText(PropertyInstanceInfo->Type);
 }
 
-TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateValueWidget(
+TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateValueWidget(
 	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
 {
 	FText ValueText;
@@ -435,7 +435,7 @@ TSharedRef<SWidget> FLiveBlueprintVariablesDetailCustomization::GenerateValueWid
 		.ToolTipText(ValueText);
 }
 
-void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData)
+void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData)
 {
 	// We have special handling for set, array, and map properties such that their immediate children 
 	// are also included in the ValueWidgetContainer. This allows the number of elements to change 
@@ -507,7 +507,7 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRowValue(FLiveBluep
 	}
 }
 
-void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRow(
+void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRow(
 	FLiveBlueprintWidgetRowData& WidgetRowData,
 	double RealTimeInSeconds)
 {
@@ -529,7 +529,7 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRow(
 		WidgetRowData.LastUpdateTimeInSeconds = RealTimeInSeconds;
 	}
 
-	const ULiveBlueprintVariablesSettings* Settings = GetDefault<ULiveBlueprintVariablesSettings>();
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
 
 	if (Settings->bHighlightValuesThatHaveChanged)
 	{
@@ -546,7 +546,7 @@ void FLiveBlueprintVariablesDetailCustomization::UpdateWidgetRow(
 	}
 }
 
-FString FLiveBlueprintVariablesDetailCustomization::GetPropertyCategoryString(FProperty* Property)
+FString FLiveBlueprintDebuggerDetailCustomization::GetPropertyCategoryString(FProperty* Property)
 {
     FString Category = c_PrivateCategoryName;
     
@@ -561,7 +561,7 @@ FString FLiveBlueprintVariablesDetailCustomization::GetPropertyCategoryString(FP
     return Category;
 }
 
-uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Container, const FProperty* Property)
+uint32 FLiveBlueprintDebuggerDetailCustomization::GetPropertyValueHash(void* Container, const FProperty* Property)
 {
 	uint32 ValueHash = 0;
 
@@ -573,7 +573,7 @@ uint32 FLiveBlueprintVariablesDetailCustomization::GetPropertyValueHash(void* Co
 	return ValueHash;
 }
 
-TArray<FDebugTreeItemPtr> FLiveBlueprintVariablesDetailCustomization::GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor)
+TArray<FDebugTreeItemPtr> FLiveBlueprintDebuggerDetailCustomization::GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor)
 {
 	TArray<FDebugTreeItemPtr> PropertyDebugTreeItems;
 
@@ -587,7 +587,7 @@ TArray<FDebugTreeItemPtr> FLiveBlueprintVariablesDetailCustomization::GetActorBl
 	return PropertyDebugTreeItems;
 }
 
-TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintVariablesDetailCustomization::GetPropertyInstanceInfo(void* Container, const FProperty* Property)
+TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintDebuggerDetailCustomization::GetPropertyInstanceInfo(void* Container, const FProperty* Property)
 {
 	TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 	FKismetDebugUtilities::GetDebugInfoInternal(
@@ -598,7 +598,7 @@ TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintVariablesDetailCustomization::Ge
 	return InstanceInfo;
 }
 
-bool FLiveBlueprintVariablesDetailCustomization::ShouldExpandProperty(const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+bool FLiveBlueprintDebuggerDetailCustomization::ShouldExpandProperty(const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
 {
 	return (
 		// We don't expand a property if it doesn't have any children.

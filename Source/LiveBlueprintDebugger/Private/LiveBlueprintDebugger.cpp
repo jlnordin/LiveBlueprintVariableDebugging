@@ -1,29 +1,29 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#include "LiveBlueprintVariables.h"
-#include "LiveBlueprintVariablesDetailCustomization.h"
+#include "LiveBlueprintDebugger.h"
+#include "LiveBlueprintDebuggerDetailCustomization.h"
 
 #include "ActorDetailsDelegates.h"
 #include "LevelEditor.h"
 #include "PropertyEditorModule.h"
 
-#define LOCTEXT_NAMESPACE "FLiveBlueprintVariablesModule"
+#define LOCTEXT_NAMESPACE "FLiveBlueprintDebuggerModule"
 
-DEFINE_LOG_CATEGORY(LogLiveBlueprintVariables);
+DEFINE_LOG_CATEGORY(LogLiveBlueprintDebugger);
 
-void FLiveBlueprintVariablesModule::StartupModule()
+void FLiveBlueprintDebuggerModule::StartupModule()
 {
 	// Register extended actor details provider.
-	UE_LOG(LogLiveBlueprintVariables, Verbose, TEXT("Initializing LiveBlueprintVariables module."));
+	UE_LOG(LogLiveBlueprintDebugger, Verbose, TEXT("Initializing LiveBlueprintDebugger module."));
 	DetailCustomizationDelegateHandle = OnExtendActorDetails.AddLambda(
 		[this](class IDetailLayoutBuilder& DetailBuilder, const FGetSelectedActors& /*GetSelectedActorsDelegate*/)
 		{
 			CurrentDetailCustomization.Reset();
-			CurrentDetailCustomization = FLiveBlueprintVariablesDetailCustomization::CreateForLayoutBuilder(DetailBuilder);
+			CurrentDetailCustomization = FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(DetailBuilder);
 		});
 }
 
-void FLiveBlueprintVariablesModule::ShutdownModule()
+void FLiveBlueprintDebuggerModule::ShutdownModule()
 {
 	OnExtendActorDetails.Remove(DetailCustomizationDelegateHandle);
 	DetailCustomizationDelegateHandle.Reset();
@@ -32,4 +32,4 @@ void FLiveBlueprintVariablesModule::ShutdownModule()
 
 #undef LOCTEXT_NAMESPACE
 	
-IMPLEMENT_MODULE(FLiveBlueprintVariablesModule, LiveBlueprintVariables)
+IMPLEMENT_MODULE(FLiveBlueprintDebuggerModule, LiveBlueprintDebugger)

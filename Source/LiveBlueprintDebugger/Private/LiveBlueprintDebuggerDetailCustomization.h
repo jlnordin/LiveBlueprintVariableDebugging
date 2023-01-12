@@ -17,10 +17,10 @@ struct FLiveBlueprintWidgetRowData
 /**
  * Adds additional detail customizations for any Actor class that also has Blueprint variables.
  */
-class FLiveBlueprintVariablesDetailCustomization
+class FLiveBlueprintDebuggerDetailCustomization
 {
 public:
-	static TUniquePtr<FLiveBlueprintVariablesDetailCustomization> CreateForLayoutBuilder(
+	static TUniquePtr<FLiveBlueprintDebuggerDetailCustomization> CreateForLayoutBuilder(
 		IDetailLayoutBuilder& LayoutBuilder);
 
 private:
@@ -28,9 +28,9 @@ private:
 	static bool IsAnyAncestorABlueprintClass(UClass* Class);
 
 private:
-	FLiveBlueprintVariablesDetailCustomization(TWeakObjectPtr<AActor> ActorToCustomize, IDetailLayoutBuilder& LayoutBuilder);
+	FLiveBlueprintDebuggerDetailCustomization(TWeakObjectPtr<AActor> ActorToCustomize, IDetailLayoutBuilder& LayoutBuilder);
 public:
-	~FLiveBlueprintVariablesDetailCustomization();
+	~FLiveBlueprintDebuggerDetailCustomization();
 	
 private:
 	void UpdateBlueprintDetails();

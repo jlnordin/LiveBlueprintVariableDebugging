@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
 
-#include "LiveBlueprintVariablesSettings.generated.h"
+#include "LiveBlueprintDebuggerSettings.generated.h"
 
 
 UENUM()
@@ -23,7 +23,7 @@ enum class EVariablesVisibilityFilter : uint8
 
 
 UCLASS(Config = EditorPerProjectUserSettings)
-class LIVEBLUEPRINTVARIABLEDEBUGGING_API ULiveBlueprintVariablesSettings : public UDeveloperSettings
+class LIVEBLUEPRINTVARIABLEDEBUGGING_API ULiveBlueprintDebuggerSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 
@@ -32,16 +32,16 @@ public:
 
 	virtual FName GetContainerName() const { return FName("Project"); }
 	virtual FName GetCategoryName() const { return FName("Plugins"); }
-	virtual FName GetSectionName() const { return FName("LiveBlueprintVariablesSettings"); }
+	virtual FName GetSectionName() const { return FName("LiveBlueprintDebuggerSettings"); }
 
 	virtual FText GetSectionText() const override
 	{
-		return NSLOCTEXT("LiveBlueprintVariables", "LiveBlueprintVariablesSettingsName", "Live Blueprint Variable Debugging");
+		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsName", "Live Blueprint Variable Debugging");
 	}
 
 	virtual FText GetSectionDescription() const override
 	{
-		return NSLOCTEXT("LiveBlueprintVariables", "LiveBlueprintVariablesSettingsDescription", "Configure the Live Blueprint Variable Debugging plugin.");
+		return NSLOCTEXT("LiveBlueprintDebugger", "LiveBlueprintDebuggerSettingsDescription", "Configure the Live Blueprint Variable Debugging plugin.");
 	}
 
 public:

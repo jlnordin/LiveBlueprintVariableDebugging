@@ -9,9 +9,9 @@
 class FToolBarBuilder;
 class FMenuBuilder;
 
-DECLARE_LOG_CATEGORY_EXTERN(LogLiveBlueprintVariables, Display, All);
+DECLARE_LOG_CATEGORY_EXTERN(LogLiveBlueprintDebugger, Display, All);
 
-class FLiveBlueprintVariablesModule : public IModuleInterface
+class FLiveBlueprintDebuggerModule : public IModuleInterface
 {
 public:
 
@@ -21,5 +21,5 @@ public:
 
 private:
 	FDelegateHandle DetailCustomizationDelegateHandle;
-	TUniquePtr<class FLiveBlueprintVariablesDetailCustomization> CurrentDetailCustomization;
+	TUniquePtr<class FLiveBlueprintDebuggerDetailCustomization> CurrentDetailCustomization;
 };
