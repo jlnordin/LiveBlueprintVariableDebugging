@@ -556,6 +556,7 @@ FString FLiveBlueprintDebuggerDetailCustomization::GetPropertyCategoryString(FPr
         MetaDataMap->Contains(FName("Category")))
     {
         Category = *(MetaDataMap->Find(FName("Category")));
+		Category.ReplaceInline(TEXT("|"), TEXT(" "));
     }
 
     return Category;
