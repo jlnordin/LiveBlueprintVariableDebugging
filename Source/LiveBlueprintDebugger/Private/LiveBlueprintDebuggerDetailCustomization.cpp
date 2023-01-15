@@ -566,7 +566,23 @@ uint32 FLiveBlueprintDebuggerDetailCustomization::GetPropertyValueHash(void* Con
 {
 	uint32 ValueHash = 0;
 
-	if ((Property->PropertyFlags & CPF_HasGetValueTypeHash) && !Property->IsA<FStructProperty>())
+	if (Property->IsA<FStructProperty>() ||
+		Property->IsA<FArrayProperty>() ||
+		Property->IsA<FMapProperty>() ||
+		Property->IsA<FSetProperty>())
+	{
+		TSharedPtr<FPropertyInstanceInfo> SetInfo = GetPropertyInstanceInfo(Container, Property);
+
+		for (const auto& Child : SetInfo->Children)
+		{
+			ValueHash = HashCombineFast(
+				ValueHash,
+				GetPropertyValueHash(
+					Property->ContainerPtrToValuePtr<void>(Container),
+					*Child->Property));
+		}
+	}
+	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
 	{
 		ValueHash = Property->GetValueTypeHash(Property->ContainerPtrToValuePtr<void>(Container));
 	}
