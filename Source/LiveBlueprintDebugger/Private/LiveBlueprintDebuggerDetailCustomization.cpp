@@ -537,6 +537,11 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRow(
 	FLiveBlueprintWidgetRowData& WidgetRowData,
 	double RealTimeInSeconds)
 {
+	if (*WidgetRowData.PropertyInstanceInfo->Property == nullptr)
+	{
+		return;
+	}
+
 	SBorder& Border = *WidgetRowData.ValueBorderWidget;
 
 	uint32 NewValueHash = GetPropertyValueHash(
@@ -609,12 +614,6 @@ uint32 FLiveBlueprintDebuggerDetailCustomization::GetPropertyValueHash(void* Con
 					ValueHash, 
 					ChildProperty->GetValueTypeHash(ChildProperty->ContainerPtrToValuePtr<void>(ChildContainer)));
 			}
-
-			/*ValueHash = HashCombineFast(
-				ValueHash,
-				GetPropertyValueHash(
-					Property->ContainerPtrToValuePtr<void>(Container),
-					*Child->Property));*/
 		}
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
