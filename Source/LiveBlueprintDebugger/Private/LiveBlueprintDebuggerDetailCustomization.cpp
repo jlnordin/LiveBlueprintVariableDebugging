@@ -42,8 +42,7 @@ static TArray<PropertyDebugItemPair> GetChildren(
 }
 
 static const FString c_PrivateCategoryName = "Private Implementation Variables";
-static const float c_PropertyRefreshPeriodInSeconds = 0.1f;
-static const FSlateColorBrush c_HighlightedBackgroundBrush = FSlateColorBrush(FLinearColor(0.0f, 1.0f, 0.0f, 0.6f));
+static const FSlateColorBrush c_HighlightedBackgroundBrush = FSlateColorBrush(FLinearColor::White);
 
 TUniquePtr<FLiveBlueprintDebuggerDetailCustomization> FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(
 	IDetailLayoutBuilder& LayoutBuilder)
@@ -221,16 +220,43 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		}
 	}
 
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
+
 	// Register a timer to keep our values up-to-date.
-	if (Actor->GetWorld()->WorldType == EWorldType::PIE)
+	if (Actor->GetWorld()->WorldType == EWorldType::PIE &&
+		Settings->PropertyRefreshRate != EPropertyRefreshRate::NoLiveUpdates)
 	{
+		float RefreshPeriod = 1.0f;
+
+		switch (Settings->PropertyRefreshRate)
+		{
+			default:
+			case EPropertyRefreshRate::One:
+			{
+				RefreshPeriod = 1.0f;
+				break;
+			}
+
+			case EPropertyRefreshRate::Ten:
+			{
+				RefreshPeriod = 0.1f;
+				break;
+			}
+
+			case EPropertyRefreshRate::Thirty:
+			{
+				RefreshPeriod = 0.0334f;
+				break;
+			}
+		}
+
 		Actor->GetWorldTimerManager().SetTimer(
 			UpdateTimerHandle,
 			[this]()
 			{
 				UpdateBlueprintDetails();
 			},
-			c_PropertyRefreshPeriodInSeconds,
+			RefreshPeriod,
 			true);
 	}
 }
@@ -536,11 +562,8 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRow(
 		double TimeSincePropertyChanged = (RealTimeInSeconds - WidgetRowData.LastUpdateTimeInSeconds);
 		if (TimeSincePropertyChanged <= 2.0)
 		{
-			FLinearColor BackgroundColor = FLinearColor::LerpUsingHSV(
-				FLinearColor::Green,
-				FLinearColor::Transparent,
-				static_cast<float>(std::clamp(TimeSincePropertyChanged, 0.0, 1.0)));
-
+			FLinearColor BackgroundColor = Settings->PropertyChangedHighlightColor;
+			BackgroundColor.A = BackgroundColor.A * (1.0f - static_cast<float>(std::clamp(TimeSincePropertyChanged, 0.0, 1.0)));
 			Border.SetBorderBackgroundColor(BackgroundColor);
 		}
 	}
@@ -573,13 +596,25 @@ uint32 FLiveBlueprintDebuggerDetailCustomization::GetPropertyValueHash(void* Con
 	{
 		TSharedPtr<FPropertyInstanceInfo> SetInfo = GetPropertyInstanceInfo(Container, Property);
 
+		void* ChildContainer = Property->ContainerPtrToValuePtr<void>(Container);
+
 		for (const auto& Child : SetInfo->Children)
 		{
-			ValueHash = HashCombineFast(
+			const FProperty* ChildProperty = *Child->Property;
+
+			if (!ChildProperty->IsA<FStructProperty>() &&
+				(ChildProperty->PropertyFlags & CPF_HasGetValueTypeHash))
+			{
+				ValueHash = HashCombineFast(
+					ValueHash, 
+					ChildProperty->GetValueTypeHash(ChildProperty->ContainerPtrToValuePtr<void>(ChildContainer)));
+			}
+
+			/*ValueHash = HashCombineFast(
 				ValueHash,
 				GetPropertyValueHash(
 					Property->ContainerPtrToValuePtr<void>(Container),
-					*Child->Property));
+					*Child->Property));*/
 		}
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
