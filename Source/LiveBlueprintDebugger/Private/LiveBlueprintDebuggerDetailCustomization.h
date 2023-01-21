@@ -5,7 +5,6 @@
 
 struct FLiveBlueprintWidgetRowData
 {
-	TSharedPtr<class FDebugLineItem> DebugItem;
 	void* Container = nullptr;
 	TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo;
 	double LastUpdateTimeInSeconds = 0.0;
@@ -36,7 +35,6 @@ private:
 	void UpdateBlueprintDetails();
 
 	void ExpandPropertyChildren(
-		TSharedPtr<class FDebugLineItem> DebugItem, 
 		class IDetailGroup& Group, 
 		TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo,
 		void* Container,
@@ -44,6 +42,7 @@ private:
 	
 	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData, int LogIndentation = 0);
 	static TSharedRef<class SWidget> GenerateNameIcon(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+	static TSharedRef<class SWidget> GenerateNameWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 	static TSharedRef<class SWidget> GenerateValueWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData);
 	static void UpdateWidgetRow(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);

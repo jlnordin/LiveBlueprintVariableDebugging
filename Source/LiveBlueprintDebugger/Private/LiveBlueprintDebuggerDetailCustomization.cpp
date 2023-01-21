@@ -1,5 +1,6 @@
 #include "LiveBlueprintDebuggerDetailCustomization.h"
 
+#include <chrono>
 #include "BlueprintEditor.h"
 #include "DetailCategoryBuilder.h"
 #include "DetailLayoutBuilder.h"
@@ -13,33 +14,6 @@
 #include "Widgets/Text/STextBlock.h"
 
 #define LOCTEXT_NAMESPACE "FLiveBlueprintDebuggerModule"
-
-struct PropertyDebugItemPair
-{
-	TSharedPtr<FPropertyInstanceInfo> PropertyInstanceInfo;
-	FDebugTreeItemPtr DebugItem;
-};
-
-static TArray<PropertyDebugItemPair> GetChildren(
-	TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo,
-	FDebugTreeItemPtr& DebugItem)
-{
-	TArray<PropertyDebugItemPair> Children;
-	Children.Reserve(PropertyInstanceInfo->Children.Num());
-
-	TArray<FDebugTreeItemPtr> DebugItemChildren;
-	DebugItem->GatherChildrenBase(DebugItemChildren, FString());
-
-	for (
-		int32 ChildDebugIndex = 0, ChildPropertyIndex = 0;
-		ChildDebugIndex < DebugItemChildren.Num() && ChildPropertyIndex < PropertyInstanceInfo->Children.Num();
-		ChildDebugIndex++, ChildPropertyIndex++)
-	{
-		Children.Add({PropertyInstanceInfo->Children[ChildPropertyIndex], DebugItemChildren[ChildDebugIndex]});
-	}
-
-	return Children;
-}
 
 static const FString c_PrivateCategoryName = "Private Implementation Variables";
 static const FSlateColorBrush c_HighlightedBackgroundBrush = FSlateColorBrush(FLinearColor::White);
@@ -131,6 +105,8 @@ bool FLiveBlueprintDebuggerDetailCustomization::IsAnyAncestorABlueprintClass(UCl
 	return false;
 }
 
+long long g_timeInsideGetPropertyInstanceInfoMicroSeconds = 0;
+
 FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomization(
 	TWeakObjectPtr<AActor> ActorToCustomize,
 	IDetailLayoutBuilder& LayoutBuilder) :
@@ -142,15 +118,11 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		TEXT("Customizing Actor '%s'..."),
 		*Actor->GetName());
 
+	g_timeInsideGetPropertyInstanceInfoMicroSeconds = 0;
+
 	// Categorize and sort the properties associated with this Blueprint class.
-	TArray<FDebugTreeItemPtr> DebugTreeItems = 
-		GetActorBlueprintPropertiesAsDebugTreeItemPtrs(Actor.Get());
-
-	TMap<FString, TArray<PropertyDebugItemPair>> PropertiesByCategory;
-
-	int32 DebugTreeItemIndex = 0;
-	TFieldIterator<FProperty> Iterator{ Actor->GetClass() };
-	while ((Iterator != nullptr) && (DebugTreeItemIndex < DebugTreeItems.Num()))
+	TMap<FString, TArray<TSharedPtr<FPropertyInstanceInfo>>> PropertiesByCategory;
+	for (auto Iterator = TFieldIterator<FProperty>(Actor->GetClass()); Iterator != nullptr; ++Iterator)
 	{
 		FProperty* Property = *Iterator;
 
@@ -158,14 +130,9 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		{
 			PropertiesByCategory.FindOrAdd(GetPropertyCategoryString(Property)).Add(
 				{ 
-					GetPropertyInstanceInfo(Actor.Get(), Property), 
-					DebugTreeItems[DebugTreeItemIndex]
+					GetPropertyInstanceInfo(Actor.Get(), Property)
 				});
-
-			++DebugTreeItemIndex;
 		}
-
-		++Iterator;
 	}
 
 	// Add the Blueprint details section.
@@ -173,7 +140,7 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 	TSharedRef<FPropertySection> BlueprintSection = PropertyModule.FindOrCreateSection("Actor", "Blueprint", LOCTEXT("BlueprintSection", "Blueprint"));
 
 	// Add widgets for all of the categories and properties.
-	for (auto& [CategoryString, PropertyAndDebugItemArray] : PropertiesByCategory)
+	for (auto& [CategoryString, PropertyInfoArray] : PropertiesByCategory)
 	{
 		FName CategoryName = *FString::Printf(TEXT("Blueprint Properties - %s"), *CategoryString);
 
@@ -183,13 +150,12 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		}
 
 		IDetailCategoryBuilder& BlueprintCategory = LayoutBuilder.EditCategory(CategoryName);
-
-		for (auto& [PropertyInstanceInfo, DebugItem] : PropertyAndDebugItemArray)
+		
+		for (auto& PropertyInstanceInfo : PropertyInfoArray)
 		{
 			if (ShouldExpandProperty(PropertyInstanceInfo))
 			{
 				ExpandPropertyChildren(
-					DebugItem,
 					BlueprintCategory.AddGroup(
 						PropertyInstanceInfo->Property->GetFName(), 
 						PropertyInstanceInfo->DisplayName),
@@ -203,11 +169,12 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 					(CategoryString == c_PrivateCategoryName);
 
 				FLiveBlueprintWidgetRowData NewRowData = {
-					DebugItem,
 					Actor.Get(),
 					PropertyInstanceInfo,
 					0,
-					0
+					0,
+					{},
+					{}
 				};
 
 				FillInWidgetRow(
@@ -285,7 +252,6 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateBlueprintDetails()
 }
 
 void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
-	FDebugTreeItemPtr DebugItem,
 	IDetailGroup& Group,
 	TSharedPtr<FPropertyInstanceInfo> PropertyInstanceInfo,
 	void* Container,
@@ -293,16 +259,18 @@ void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
 {
 	// Fill in the group's header row.
 	FLiveBlueprintWidgetRowData HeaderRowData = {
-		DebugItem,
 		Container,
 		PropertyInstanceInfo,
 		0,
-		0};
+		0,
+		{},
+		{}
+	};
 
 	FillInWidgetRow(Group.HeaderRow(), HeaderRowData, LevelsOfRecursion * 2 + 2);
 	WidgetRows.Add(HeaderRowData);
 
-	for (const auto&[ChildPropertyInfo, ChildDebugItem] : GetChildren(PropertyInstanceInfo, DebugItem))
+	for (const auto& ChildPropertyInfo : PropertyInstanceInfo->Children)
 	{
         if (ShouldExpandProperty(ChildPropertyInfo) && LevelsOfRecursion < 5)
         {
@@ -312,7 +280,6 @@ void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
                 false);
 
 			ExpandPropertyChildren(
-				ChildDebugItem,
 				SubGroup,
 				ChildPropertyInfo,
 				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container),
@@ -321,11 +288,12 @@ void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
         else
         {
 			FLiveBlueprintWidgetRowData NewRowData = {
-				ChildDebugItem,
 				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container),
 				ChildPropertyInfo,
 				0,
-				0
+				0,
+				{},
+				{}
 			};
 
 			FillInWidgetRow(Group.AddWidgetRow(), NewRowData, LevelsOfRecursion * 2 + 2);
@@ -374,7 +342,7 @@ void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 			.VAlign(VAlign_Center)
 			.Padding(5.f, 0.f, 0.f, 0.f)
 			[
-				WidgetRowData.DebugItem->GenerateNameWidget(MakeShared<FString>())
+				GenerateNameWidget(WidgetRowData.PropertyInstanceInfo)
 			]
 		]
 		.ValueContent()
@@ -387,12 +355,6 @@ void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 			.Content()
 			[
 				SAssignNew(WidgetRowData.ValueWidgetContainer, SHorizontalBox)
-		
-				+ SHorizontalBox::Slot()
-				.AutoWidth()
-				[
-					WidgetRowData.DebugItem->GetValueIcon()
-				]
 
 				+ SHorizontalBox::Slot()
 				.AutoWidth()
@@ -425,6 +387,14 @@ TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameIcon(
 		.Image(IconBrush)
 		.ColorAndOpacity(BaseColor)
 		.ToolTipText(PropertyInstanceInfo->Type);
+}
+
+TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameWidget(
+	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+{
+	return SNew(STextBlock)
+		.Text(PropertyInstanceInfo->DisplayName)
+		.ToolTipText(PropertyInstanceInfo->DisplayName);
 }
 
 TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateValueWidget(
@@ -474,8 +444,7 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 	{
 		auto VerticalBox = SNew(SVerticalBox);
 		
-		for (const auto& [ChildPropertyInfo, ChildDebugItem] :
-			GetChildren(WidgetRowData.PropertyInstanceInfo, WidgetRowData.DebugItem))
+		for (const auto& ChildPropertyInfo : WidgetRowData.PropertyInstanceInfo->Children)
 		{
 			if (WidgetRowData.PropertyInstanceInfo->Property->IsA<FMapProperty>())
 			{
@@ -487,7 +456,7 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 						+ SHorizontalBox::Slot()
 						.AutoWidth()
 						[
-							ChildDebugItem->GenerateNameWidget(MakeShared<FString>())
+							GenerateNameWidget(ChildPropertyInfo)
 						]
 
 						+ SHorizontalBox::Slot()
@@ -519,14 +488,14 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 				];
 		}
 
-		WidgetRowData.ValueWidgetContainer->GetSlot(1)
+		WidgetRowData.ValueWidgetContainer->GetSlot(0)
 			[
 				VerticalBox
 			];
 	}
 	else
 	{
-		WidgetRowData.ValueWidgetContainer->GetSlot(1)
+		WidgetRowData.ValueWidgetContainer->GetSlot(0)
 			[
 				GenerateValueWidget(WidgetRowData.PropertyInstanceInfo)
 			];
@@ -640,11 +609,16 @@ TArray<FDebugTreeItemPtr> FLiveBlueprintDebuggerDetailCustomization::GetActorBlu
 
 TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintDebuggerDetailCustomization::GetPropertyInstanceInfo(void* Container, const FProperty* Property)
 {
+	auto start = std::chrono::high_resolution_clock::now();
+
 	TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 	FKismetDebugUtilities::GetDebugInfoInternal(
 		InstanceInfo,
 		Property,
 		Property->ContainerPtrToValuePtr<void>(Container));
+
+	g_timeInsideGetPropertyInstanceInfoMicroSeconds +=
+		std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count();
 
 	return InstanceInfo;
 }
