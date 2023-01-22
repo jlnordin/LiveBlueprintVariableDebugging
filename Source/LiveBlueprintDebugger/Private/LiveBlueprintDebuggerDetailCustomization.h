@@ -3,10 +3,16 @@
 #include "CoreMinimal.h"
 #include "IDetailCustomization.h"
 
+#include "FastPropertyInstanceInfo.h"
+
 struct FLiveBlueprintWidgetRowData
 {
-	void* Container = nullptr;
-	TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo;
+	FLiveBlueprintWidgetRowData(FFastPropertyInstanceInfo& PropertyInstanceInfo) :
+		PropertyInstanceInfo(PropertyInstanceInfo)
+	{
+	}
+
+	FFastPropertyInstanceInfo PropertyInstanceInfo;
 	double LastUpdateTimeInSeconds = 0.0;
 	uint32 ValueHash = 0;
 	TSharedPtr<class SBorder> ValueBorderWidget;
@@ -36,21 +42,17 @@ private:
 
 	void ExpandPropertyChildren(
 		class IDetailGroup& Group, 
-		TSharedPtr<struct FPropertyInstanceInfo> PropertyInstanceInfo,
-		void* Container,
+		FFastPropertyInstanceInfo& PropertyInstanceInfo,
 		int LevelsOfRecursion = 0);
 	
 	static void FillInWidgetRow(FDetailWidgetRow& WidgetRow, FLiveBlueprintWidgetRowData& WidgetRowData, int LogIndentation = 0);
-	static TSharedRef<class SWidget> GenerateNameIcon(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
-	static TSharedRef<class SWidget> GenerateNameWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
-	static TSharedRef<class SWidget> GenerateValueWidget(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+	static TSharedRef<class SWidget> GenerateNameIcon(const FFastPropertyInstanceInfo& PropertyInstanceInfo);
+	static TSharedRef<class SWidget> GenerateNameWidget(const FFastPropertyInstanceInfo& PropertyInstanceInfo);
+	static TSharedRef<class SWidget> GenerateValueWidget(const FFastPropertyInstanceInfo& PropertyInstanceInfo);
 	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData);
 	static void UpdateWidgetRow(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);
 	static FString GetPropertyCategoryString(FProperty* Property);
-	static uint32 GetPropertyValueHash(void* Container, const FProperty* Property);
 	static TArray<TSharedPtr<class FDebugLineItem>> GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor);
-	static TSharedPtr<struct FPropertyInstanceInfo> GetPropertyInstanceInfo(void* Container, const FProperty* Property);
-	static bool ShouldExpandProperty(const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 
 	TWeakObjectPtr<AActor> Actor;
 	TArray<FLiveBlueprintWidgetRowData> WidgetRows;

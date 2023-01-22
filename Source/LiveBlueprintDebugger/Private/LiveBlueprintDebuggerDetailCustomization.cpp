@@ -18,6 +18,7 @@
 static const FString c_PrivateCategoryName = "Private Implementation Variables";
 static const FSlateColorBrush c_HighlightedBackgroundBrush = FSlateColorBrush(FLinearColor::White);
 
+
 TUniquePtr<FLiveBlueprintDebuggerDetailCustomization> FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(
 	IDetailLayoutBuilder& LayoutBuilder)
 {
@@ -105,8 +106,6 @@ bool FLiveBlueprintDebuggerDetailCustomization::IsAnyAncestorABlueprintClass(UCl
 	return false;
 }
 
-long long g_timeInsideGetPropertyInstanceInfoMicroSeconds = 0;
-
 FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomization(
 	TWeakObjectPtr<AActor> ActorToCustomize,
 	IDetailLayoutBuilder& LayoutBuilder) :
@@ -118,10 +117,8 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		TEXT("Customizing Actor '%s'..."),
 		*Actor->GetName());
 
-	g_timeInsideGetPropertyInstanceInfoMicroSeconds = 0;
-
 	// Categorize and sort the properties associated with this Blueprint class.
-	TMap<FString, TArray<TSharedPtr<FPropertyInstanceInfo>>> PropertiesByCategory;
+	TMap<FString, TArray<FFastPropertyInstanceInfo>> PropertiesByCategory;
 	for (auto Iterator = TFieldIterator<FProperty>(Actor->GetClass()); Iterator != nullptr; ++Iterator)
 	{
 		FProperty* Property = *Iterator;
@@ -130,7 +127,7 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		{
 			PropertiesByCategory.FindOrAdd(GetPropertyCategoryString(Property)).Add(
 				{ 
-					GetPropertyInstanceInfo(Actor.Get(), Property)
+					FFastPropertyInstanceInfo(Actor.Get(), Property)
 				});
 		}
 	}
@@ -153,32 +150,24 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		
 		for (auto& PropertyInstanceInfo : PropertyInfoArray)
 		{
-			if (ShouldExpandProperty(PropertyInstanceInfo))
+			if (FFastPropertyInstanceInfo::ShouldExpandProperty(PropertyInstanceInfo))
 			{
 				ExpandPropertyChildren(
 					BlueprintCategory.AddGroup(
-						PropertyInstanceInfo->Property->GetFName(), 
-						PropertyInstanceInfo->DisplayName),
-					PropertyInstanceInfo,
-					Actor.Get());
+						PropertyInstanceInfo.GetProperty()->GetFName(),
+						PropertyInstanceInfo.GetDisplayName()),
+					PropertyInstanceInfo);
 			}
 			else
 			{
 				const bool bAdvancedDisplay =
-					PropertyInstanceInfo->Property->HasAnyPropertyFlags(CPF_AdvancedDisplay) ||
+					PropertyInstanceInfo.GetProperty()->HasAnyPropertyFlags(CPF_AdvancedDisplay) ||
 					(CategoryString == c_PrivateCategoryName);
 
-				FLiveBlueprintWidgetRowData NewRowData = {
-					Actor.Get(),
-					PropertyInstanceInfo,
-					0,
-					0,
-					{},
-					{}
-				};
+				FLiveBlueprintWidgetRowData NewRowData { PropertyInstanceInfo };
 
 				FillInWidgetRow(
-					BlueprintCategory.AddCustomRow(PropertyInstanceInfo->Property->GetDisplayNameText(), bAdvancedDisplay),
+					BlueprintCategory.AddCustomRow(PropertyInstanceInfo.GetProperty()->GetDisplayNameText(), bAdvancedDisplay),
 					NewRowData,
 					0);
 
@@ -253,49 +242,31 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateBlueprintDetails()
 
 void FLiveBlueprintDebuggerDetailCustomization::ExpandPropertyChildren(
 	IDetailGroup& Group,
-	TSharedPtr<FPropertyInstanceInfo> PropertyInstanceInfo,
-	void* Container,
+	FFastPropertyInstanceInfo& PropertyInstanceInfo,
 	int LevelsOfRecursion)
 {
 	// Fill in the group's header row.
-	FLiveBlueprintWidgetRowData HeaderRowData = {
-		Container,
-		PropertyInstanceInfo,
-		0,
-		0,
-		{},
-		{}
-	};
-
+	FLiveBlueprintWidgetRowData HeaderRowData {PropertyInstanceInfo};
 	FillInWidgetRow(Group.HeaderRow(), HeaderRowData, LevelsOfRecursion * 2 + 2);
 	WidgetRows.Add(HeaderRowData);
 
-	for (const auto& ChildPropertyInfo : PropertyInstanceInfo->Children)
+	for (auto& ChildPropertyInfo : PropertyInstanceInfo.GetChildren())
 	{
-        if (ShouldExpandProperty(ChildPropertyInfo) && LevelsOfRecursion < 5)
+        if (FFastPropertyInstanceInfo::ShouldExpandProperty(ChildPropertyInfo) && LevelsOfRecursion < 5)
         {
             IDetailGroup& SubGroup = Group.AddGroup(
-				ChildPropertyInfo->Property->GetFName(),
-				ChildPropertyInfo->DisplayName,
+				ChildPropertyInfo.GetProperty()->GetFName(),
+				ChildPropertyInfo.GetDisplayName(),
                 false);
 
 			ExpandPropertyChildren(
 				SubGroup,
 				ChildPropertyInfo,
-				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container),
 				LevelsOfRecursion + 1);
         }
         else
         {
-			FLiveBlueprintWidgetRowData NewRowData = {
-				PropertyInstanceInfo->Property->ContainerPtrToValuePtr<void>(Container),
-				ChildPropertyInfo,
-				0,
-				0,
-				{},
-				{}
-			};
-
+			FLiveBlueprintWidgetRowData NewRowData { ChildPropertyInfo };
 			FillInWidgetRow(Group.AddWidgetRow(), NewRowData, LevelsOfRecursion * 2 + 2);
 			WidgetRows.Add(NewRowData);
         }
@@ -307,9 +278,7 @@ void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 	FLiveBlueprintWidgetRowData& WidgetRowData,
 	int LogIndentation)
 {
-	WidgetRowData.ValueHash = GetPropertyValueHash(
-		WidgetRowData.Container,
-		*WidgetRowData.PropertyInstanceInfo->Property);
+	WidgetRowData.ValueHash = WidgetRowData.PropertyInstanceInfo.GetValueHash();
 
 	FString Indentation = std::wstring(LogIndentation, L' ').c_str();
 
@@ -318,9 +287,9 @@ void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 		Verbose,
         TEXT("%sProperty: '%s' [%s] \tFlags: 0x%08X\tHash: %i"),
 		*Indentation,
-        *WidgetRowData.PropertyInstanceInfo->Property->GetName(),
-        *WidgetRowData.PropertyInstanceInfo->Property->GetClass()->GetName(),
-		WidgetRowData.PropertyInstanceInfo->Property->GetPropertyFlags(),
+        *WidgetRowData.PropertyInstanceInfo.GetProperty()->GetName(),
+        *WidgetRowData.PropertyInstanceInfo.GetProperty()->GetClass()->GetName(),
+		WidgetRowData.PropertyInstanceInfo.GetProperty()->GetPropertyFlags(),
 		WidgetRowData.ValueHash);
 
 	WidgetRow
@@ -367,7 +336,7 @@ void FLiveBlueprintDebuggerDetailCustomization::FillInWidgetRow(
 }
 
 TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameIcon(
-	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+	const FFastPropertyInstanceInfo& PropertyInstanceInfo)
 {
 	// Unreal 5.1 has a bug where calling FDebugLineItem::GetNameIcon will crash if the given 
 	// property falls back to the default icon. So instead of relying on this, we create our 
@@ -377,7 +346,7 @@ TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameIcon(
 	FSlateColor UnusedColor;
 	FSlateBrush const* UnusedIcon = nullptr;
 	const FSlateBrush* IconBrush = FBlueprintEditor::GetVarIconAndColorFromProperty(
-		PropertyInstanceInfo->Property.Get(),
+		PropertyInstanceInfo.GetProperty().Get(),
 		BaseColor,
 		UnusedIcon,
 		UnusedColor
@@ -386,32 +355,32 @@ TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameIcon(
 	return SNew(SImage)
 		.Image(IconBrush)
 		.ColorAndOpacity(BaseColor)
-		.ToolTipText(PropertyInstanceInfo->Type);
+		.ToolTipText(PropertyInstanceInfo.GetType());
 }
 
 TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateNameWidget(
-	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+	const FFastPropertyInstanceInfo& PropertyInstanceInfo)
 {
 	return SNew(STextBlock)
-		.Text(PropertyInstanceInfo->DisplayName)
-		.ToolTipText(PropertyInstanceInfo->DisplayName);
+		.Text(PropertyInstanceInfo.GetDisplayName())
+		.ToolTipText(PropertyInstanceInfo.GetDisplayName());
 }
 
 TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateValueWidget(
-	const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
+	const FFastPropertyInstanceInfo& PropertyInstanceInfo)
 {
 	FText ValueText;
 
-	if (PropertyInstanceInfo->Property->IsA<FObjectProperty>() || 
-		PropertyInstanceInfo->Property->IsA<FInterfaceProperty>())
+	if (PropertyInstanceInfo.GetProperty()->IsA<FObjectProperty>() || 
+		PropertyInstanceInfo.GetProperty()->IsA<FInterfaceProperty>())
 	{
 		FString ValueAsString;
-		if (PropertyInstanceInfo.IsValid() && (PropertyInstanceInfo->Object.Get() != nullptr))
+		if (PropertyInstanceInfo.IsValid() && (PropertyInstanceInfo.GetObject().Get() != nullptr))
 		{
 			ValueAsString = FString::Printf(
 				TEXT("%s (Class: %s)"),
-				*PropertyInstanceInfo->Object->GetName(),
-				*PropertyInstanceInfo->Object->GetClass()->GetName());
+				*PropertyInstanceInfo.GetObject()->GetName(),
+				*PropertyInstanceInfo.GetObject()->GetClass()->GetName());
 		}
 		else
 		{
@@ -422,7 +391,7 @@ TSharedRef<SWidget> FLiveBlueprintDebuggerDetailCustomization::GenerateValueWidg
 	}
 	else
 	{
-		const FString ValueAsString = PropertyInstanceInfo->Value.ToString();
+		const FString ValueAsString = PropertyInstanceInfo.GetValue().ToString();
 		ValueText = FText::FromString(ValueAsString.Replace(TEXT("\n"), TEXT(" ")));
 	}
 
@@ -438,15 +407,15 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 	// dynamically without needing to add a new row to the Blueprint details category, which is not 
 	// feasible after it has been constructed.
 
-	if (WidgetRowData.PropertyInstanceInfo->Property->IsA<FSetProperty>() ||
-		WidgetRowData.PropertyInstanceInfo->Property->IsA<FArrayProperty>() ||
-		WidgetRowData.PropertyInstanceInfo->Property->IsA<FMapProperty>())
+	if (WidgetRowData.PropertyInstanceInfo.GetProperty()->IsA<FSetProperty>() ||
+		WidgetRowData.PropertyInstanceInfo.GetProperty()->IsA<FArrayProperty>() ||
+		WidgetRowData.PropertyInstanceInfo.GetProperty()->IsA<FMapProperty>())
 	{
 		auto VerticalBox = SNew(SVerticalBox);
 		
-		for (const auto& ChildPropertyInfo : WidgetRowData.PropertyInstanceInfo->Children)
+		for (auto& ChildPropertyInfo : WidgetRowData.PropertyInstanceInfo.GetChildren())
 		{
-			if (WidgetRowData.PropertyInstanceInfo->Property->IsA<FMapProperty>())
+			if (WidgetRowData.PropertyInstanceInfo.GetProperty()->IsA<FMapProperty>())
 			{
 				VerticalBox->AddSlot()
 					.AutoHeight()
@@ -478,7 +447,7 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 			}
 		}
 
-		if (WidgetRowData.PropertyInstanceInfo->Children.IsEmpty())
+		if (WidgetRowData.PropertyInstanceInfo.GetChildren().IsEmpty())
 		{
 			VerticalBox->AddSlot()
 				.AutoHeight()
@@ -506,23 +475,18 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRow(
 	FLiveBlueprintWidgetRowData& WidgetRowData,
 	double RealTimeInSeconds)
 {
-	if (*WidgetRowData.PropertyInstanceInfo->Property == nullptr)
+	if (*WidgetRowData.PropertyInstanceInfo.GetProperty() == nullptr)
 	{
 		return;
 	}
 
 	SBorder& Border = *WidgetRowData.ValueBorderWidget;
 
-	uint32 NewValueHash = GetPropertyValueHash(
-		WidgetRowData.Container,
-		*WidgetRowData.PropertyInstanceInfo->Property);
+	uint32 NewValueHash = WidgetRowData.PropertyInstanceInfo.GetValueHash();
 
 	if (NewValueHash != WidgetRowData.ValueHash)
 	{
-		WidgetRowData.PropertyInstanceInfo = GetPropertyInstanceInfo(
-			WidgetRowData.Container,
-			*WidgetRowData.PropertyInstanceInfo->Property);
-
+		WidgetRowData.PropertyInstanceInfo.UpdateValue();
 		UpdateWidgetRowValue(WidgetRowData);
 
 		WidgetRowData.ValueHash = NewValueHash;
@@ -559,40 +523,6 @@ FString FLiveBlueprintDebuggerDetailCustomization::GetPropertyCategoryString(FPr
     return Category;
 }
 
-uint32 FLiveBlueprintDebuggerDetailCustomization::GetPropertyValueHash(void* Container, const FProperty* Property)
-{
-	uint32 ValueHash = 0;
-
-	if (Property->IsA<FStructProperty>() ||
-		Property->IsA<FArrayProperty>() ||
-		Property->IsA<FMapProperty>() ||
-		Property->IsA<FSetProperty>())
-	{
-		TSharedPtr<FPropertyInstanceInfo> SetInfo = GetPropertyInstanceInfo(Container, Property);
-
-		void* ChildContainer = Property->ContainerPtrToValuePtr<void>(Container);
-
-		for (const auto& Child : SetInfo->Children)
-		{
-			const FProperty* ChildProperty = *Child->Property;
-
-			if (!ChildProperty->IsA<FStructProperty>() &&
-				(ChildProperty->PropertyFlags & CPF_HasGetValueTypeHash))
-			{
-				ValueHash = HashCombineFast(
-					ValueHash, 
-					ChildProperty->GetValueTypeHash(ChildProperty->ContainerPtrToValuePtr<void>(ChildContainer)));
-			}
-		}
-	}
-	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
-	{
-		ValueHash = Property->GetValueTypeHash(Property->ContainerPtrToValuePtr<void>(Container));
-	}
-
-	return ValueHash;
-}
-
 TArray<FDebugTreeItemPtr> FLiveBlueprintDebuggerDetailCustomization::GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor)
 {
 	TArray<FDebugTreeItemPtr> PropertyDebugTreeItems;
@@ -605,44 +535,4 @@ TArray<FDebugTreeItemPtr> FLiveBlueprintDebuggerDetailCustomization::GetActorBlu
 	SelfNode->GatherChildrenBase(PropertyDebugTreeItems, FString());
 
 	return PropertyDebugTreeItems;
-}
-
-TSharedPtr<FPropertyInstanceInfo> FLiveBlueprintDebuggerDetailCustomization::GetPropertyInstanceInfo(void* Container, const FProperty* Property)
-{
-	auto start = std::chrono::high_resolution_clock::now();
-
-	TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
-	FKismetDebugUtilities::GetDebugInfoInternal(
-		InstanceInfo,
-		Property,
-		Property->ContainerPtrToValuePtr<void>(Container));
-
-	g_timeInsideGetPropertyInstanceInfoMicroSeconds +=
-		std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - start).count();
-
-	return InstanceInfo;
-}
-
-bool FLiveBlueprintDebuggerDetailCustomization::ShouldExpandProperty(const TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo)
-{
-	return (
-		// We don't expand a property if it doesn't have any children.
-		!PropertyInstanceInfo->Children.IsEmpty() &&
-
-		// We are only interested in Blueprint-visible properties as well. This is how the Kismet widgets
-		// filter their properties, so without requiring changes to the main Unreal Engine code, we also 
-		// must filter the same way.
-		PropertyInstanceInfo->Property->HasAllPropertyFlags(CPF_BlueprintVisible) &&
-
-		// Expanding object types leads to nearly unbounded recursion for discovering all of the 
-		// properties, so we filter object-type properties and UObjectWrappers out.
-		!PropertyInstanceInfo->Property->HasAnyPropertyFlags(CPF_UObjectWrapper) &&
-		!PropertyInstanceInfo->Property->IsA<FObjectProperty>() &&
-
-		// We also don't expand sets, arrays, or maps because when their values change, the number of
-		// children is also likely to change. To make the live updates more performant, we don't allow 
-		// changing the number of widgets in the details panel. Instead we update the existing ones.
-		!PropertyInstanceInfo->Property->IsA<FSetProperty>() &&
-		!PropertyInstanceInfo->Property->IsA<FArrayProperty>() &&
-		!PropertyInstanceInfo->Property->IsA<FMapProperty>());
 }
