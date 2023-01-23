@@ -486,10 +486,10 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRow(
 
 	if (NewValueHash != WidgetRowData.ValueHash)
 	{
-		WidgetRowData.PropertyInstanceInfo.UpdateValue();
+		WidgetRowData.PropertyInstanceInfo.Refresh();
 		UpdateWidgetRowValue(WidgetRowData);
 
-		WidgetRowData.ValueHash = NewValueHash;
+		WidgetRowData.ValueHash = WidgetRowData.PropertyInstanceInfo.GetValueHash();
 		WidgetRowData.LastUpdateTimeInSeconds = RealTimeInSeconds;
 	}
 

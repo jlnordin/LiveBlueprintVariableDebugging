@@ -12,9 +12,9 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 		ValuePointer(Property->ContainerPtrToValuePtr<void>(Container)),
 		Property(Property)
 {
-	PopulateObject();
-	PopulateValueTextAndTypeText();
 	PopulateChildren();
+	PopulateObject();
+	PopulateText();
 }
 
 FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
@@ -22,6 +22,7 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 	TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo) :
 		ValuePointer(ValuePointer),
 		Property(PropertyInstanceInfo->Property),
+		DisplayNameText(PropertyInstanceInfo->DisplayName),
 		ValueText(PropertyInstanceInfo->Value),
 		TypeText(PropertyInstanceInfo->Type),
 		Object(PropertyInstanceInfo->Object)
@@ -36,7 +37,7 @@ const TFieldPath<const FProperty>& FFastPropertyInstanceInfo::GetProperty() cons
 
 FText FFastPropertyInstanceInfo::GetDisplayName() const
 {
-	return Property->GetDisplayNameText();
+	return DisplayNameText;
 }
 
 FText FFastPropertyInstanceInfo::GetType() const
@@ -57,6 +58,25 @@ void* FFastPropertyInstanceInfo::GetValuePointer() const
 uint32 FFastPropertyInstanceInfo::GetValueHash() const
 {
 	uint32 ValueHash = 0;
+
+	// For array, map, and set properties, seed the hash with the number of elements. This will cause 
+	// the hash to change if the number of elements change without needing to reinitialize all of the
+	// child elements.
+	if (auto ArrayProperty = CastField<FArrayProperty>(Property.Get()); ArrayProperty != nullptr)
+	{
+		FScriptArrayHelper ArrayHelper{ ArrayProperty, ValuePointer };
+		ValueHash = ArrayHelper.Num();
+	}
+	else if (auto MapProperty = CastField<FMapProperty>(Property.Get()); MapProperty != nullptr)
+	{
+		FScriptMapHelper MapHelper{ MapProperty, ValuePointer };
+		ValueHash = MapHelper.Num();
+	}
+	else if (auto SetProperty = CastField<FSetProperty>(Property.Get()); SetProperty != nullptr)
+	{
+		FScriptSetHelper SetHelper{ SetProperty, ValuePointer };
+		ValueHash = SetHelper.Num();
+	}
 
 	if (Property->IsA<FStructProperty>() ||
 		Property->IsA<FArrayProperty>() ||
@@ -93,9 +113,11 @@ const TWeakObjectPtr<UObject>& FFastPropertyInstanceInfo::GetObject() const
 	return Object;
 }
 
-void FFastPropertyInstanceInfo::UpdateValue()
+void FFastPropertyInstanceInfo::Refresh()
 {
-	PopulateValueTextAndTypeText();
+	PopulateChildren();
+	PopulateObject();
+	PopulateText();
 }
 
 bool FFastPropertyInstanceInfo::ShouldExpandProperty(FFastPropertyInstanceInfo& PropertyInstanceInfo)
@@ -119,8 +141,33 @@ void FFastPropertyInstanceInfo::PopulateObject()
 	}
 }
 
-void FFastPropertyInstanceInfo::PopulateValueTextAndTypeText()
+FText FFastPropertyInstanceInfo::GetValueTextOfAllChildren()
 {
+	FString ValueTextBuilder = L"{";
+
+	ValueTextBuilder += FString::JoinBy(
+		Children,
+		TEXT(", "),
+		[](auto& Child)
+		{
+			return FString::Format(
+				TEXT("{0}: {1}"),
+				{
+					Child.GetDisplayName().ToString(),
+					Child.GetValue().ToString()
+				});
+		});
+
+	ValueTextBuilder += L"}";
+
+	return FText::FromString(ValueTextBuilder);
+}
+
+void FFastPropertyInstanceInfo::PopulateText()
+{
+	DisplayNameText = Property->GetDisplayNameText();
+	TypeText = Property->GetClass()->GetDisplayNameText();
+
 	if (Property->IsA<FObjectPropertyBase>() || 
 		Property->IsA<FInterfaceProperty>())
 	{
@@ -136,11 +183,43 @@ void FFastPropertyInstanceInfo::PopulateValueTextAndTypeText()
 	}
 	else if (auto StructProperty = CastField<FStructProperty>(*Property); StructProperty != nullptr)
 	{
-		// We explicitly leave the ValueText of a struct empty instead of attempting to summarize all of 
-		// its members. We also explicitly avoid calling the FKismetDebugUtilities::GetDebugInfoInternal
-		// helper function since it will recursively expand all children of this struct before returning.
-		ValueText = {};
-		TypeText = StructProperty->GetClass()->GetDisplayNameText();
+		ValueText = GetValueTextOfAllChildren();
+		TypeText = StructProperty->Struct->GetDisplayNameText();
+	}
+	else if (auto ArrayProperty = CastField<FArrayProperty>(*Property); ArrayProperty != nullptr)
+	{
+		ValueText = GetValueTextOfAllChildren();
+
+		if (ArrayProperty->Inner != nullptr)
+		{
+			TypeText = FText::FromString(
+				FString::Format(TEXT("Array of {0}"), { ArrayProperty->Inner->GetClass()->GetName() }));
+		}
+	}
+	else if (auto MapProperty = CastField<FMapProperty>(*Property); MapProperty != nullptr)
+	{
+		ValueText = GetValueTextOfAllChildren();
+
+		if (MapProperty->KeyProp != nullptr &&
+			MapProperty->ValueProp != nullptr)
+		{
+			TypeText = FText::FromString(
+				FString::Format(TEXT("Map of {0} to {1}"), 
+					{ 
+						MapProperty->KeyProp->GetClass()->GetName(),
+						MapProperty->ValueProp->GetClass()->GetName()
+					}));
+		}
+	}
+	else if (auto SetProperty = CastField<FSetProperty>(*Property); SetProperty != nullptr)
+	{
+		ValueText = GetValueTextOfAllChildren();
+
+		if (SetProperty->ElementProp != nullptr)
+		{
+			TypeText = FText::FromString(
+				FString::Format(TEXT("Array of {0}"), { SetProperty->ElementProp->GetClass()->GetName() }));
+		}
 	}
 	else
 	{
@@ -154,6 +233,7 @@ void FFastPropertyInstanceInfo::PopulateValueTextAndTypeText()
 			*Property,
 			ValuePointer);
 
+		DisplayNameText = InstanceInfo->DisplayName;
 		ValueText = InstanceInfo->Value;
 		TypeText = InstanceInfo->Type;
 	}

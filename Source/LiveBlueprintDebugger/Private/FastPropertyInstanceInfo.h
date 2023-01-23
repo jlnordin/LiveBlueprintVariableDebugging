@@ -26,17 +26,19 @@ public:
 	bool IsValid() const;
 	const TWeakObjectPtr<UObject>& GetObject() const;
 
-	void UpdateValue();
+	void Refresh();
 
 	static bool ShouldExpandProperty(FFastPropertyInstanceInfo& PropertyInstanceInfo);
 
 private:
 	void PopulateObject();
-	void PopulateValueTextAndTypeText();
+	FText GetValueTextOfAllChildren();
+	void PopulateText();
 	void PopulateChildren();
 	
 	void* ValuePointer = nullptr;
 	TFieldPath<const FProperty> Property;
+	FText DisplayNameText;
 	FText ValueText;
 	FText TypeText;
 	TWeakObjectPtr<UObject> Object = nullptr;
