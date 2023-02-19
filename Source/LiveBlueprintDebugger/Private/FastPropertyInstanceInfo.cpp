@@ -4,6 +4,8 @@
 
 #include "Kismet2/KismetDebugUtilities.h"
 
+#include <string_view>
+
 #define LOCTEXT_NAMESPACE "FLiveBlueprintDebuggerModule"
 
 FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
@@ -89,6 +91,15 @@ uint32 FFastPropertyInstanceInfo::GetValueHash() const
 				ValueHash,
 				Child.GetValueHash());
 		}
+	}
+	else if (Property->IsA<FInterfaceProperty>())
+	{
+		// FInterfaceProperty doesn't define a GetValueTypeHashInternal override function, so we instead
+		// use the hash of its value string.
+
+		FString ValueString = ValueText.ToString();
+		std::hash<std::wstring_view> Hasher;
+		ValueHash = Hasher({ *ValueString, static_cast<size_t>(ValueString.Len()) });
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
 	{
