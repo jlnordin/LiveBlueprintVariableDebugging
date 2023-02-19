@@ -1,3 +1,5 @@
+// Copyright (c) 2022-2023 Justin Nordin. All Rights Reserved.
+
 #include "FastPropertyInstanceInfo.h"
 
 #include "LiveBlueprintDebugger.h"
