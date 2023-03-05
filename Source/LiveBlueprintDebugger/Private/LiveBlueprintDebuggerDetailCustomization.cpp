@@ -2,6 +2,7 @@
 
 #include "LiveBlueprintDebuggerDetailCustomization.h"
 
+#include <algorithm>
 #include <chrono>
 #include "BlueprintEditor.h"
 #include "DetailCategoryBuilder.h"
@@ -57,7 +58,7 @@ TWeakObjectPtr<AActor> FLiveBlueprintDebuggerDetailCustomization::GetActorToCust
     TArray<TWeakObjectPtr<UObject>> ObjectsBeingCustomized;
     LayoutBuilder.GetObjectsBeingCustomized(ObjectsBeingCustomized);
 
-    if (ObjectsBeingCustomized.IsEmpty())
+    if (ObjectsBeingCustomized.Num() == 0)
     {
         UE_LOG(
             LogLiveBlueprintDebugger,
@@ -133,19 +134,23 @@ FLiveBlueprintDebuggerDetailCustomization::FLiveBlueprintDebuggerDetailCustomiza
 		}
 	}
 
+#if ENGINE_MAJOR_VERSION == 5
 	// Add the Blueprint details section.
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	TSharedRef<FPropertySection> BlueprintSection = PropertyModule.FindOrCreateSection("Actor", "Blueprint", LOCTEXT("BlueprintSection", "Blueprint"));
+#endif
 
 	// Add widgets for all of the categories and properties.
 	for (auto& [CategoryString, PropertyInfoArray] : PropertiesByCategory)
 	{
 		FName CategoryName = *FString::Printf(TEXT("Blueprint Properties - %s"), *CategoryString);
 
+#if ENGINE_MAJOR_VERSION == 5
 		if (!BlueprintSection->HasAddedCategory(CategoryName))
 		{
 			BlueprintSection->AddCategory(CategoryName);
 		}
+#endif
 
 		IDetailCategoryBuilder& BlueprintCategory = LayoutBuilder.EditCategory(CategoryName);
 		
@@ -448,7 +453,7 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 			}
 		}
 
-		if (WidgetRowData.PropertyInstanceInfo.GetChildren().IsEmpty())
+		if (WidgetRowData.PropertyInstanceInfo.GetChildren().Num() == 0)
 		{
 			VerticalBox->AddSlot()
 				.AutoHeight()
@@ -458,17 +463,47 @@ void FLiveBlueprintDebuggerDetailCustomization::UpdateWidgetRowValue(FLiveBluepr
 				];
 		}
 
+#if ENGINE_MAJOR_VERSION == 4
+		WidgetRowData.ValueBorderWidget->SetContent
+			(
+				SAssignNew(WidgetRowData.ValueWidgetContainer, SHorizontalBox)
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.HAlign(HAlign_Left)
+				.Padding(.5f, 1.f)
+				[
+					VerticalBox
+				]
+			);
+#else
 		WidgetRowData.ValueWidgetContainer->GetSlot(0)
 			[
 				VerticalBox
 			];
+#endif
 	}
 	else
 	{
+#if ENGINE_MAJOR_VERSION == 4
+		WidgetRowData.ValueBorderWidget->SetContent
+			(
+				SAssignNew(WidgetRowData.ValueWidgetContainer, SHorizontalBox)
+
+				+ SHorizontalBox::Slot()
+				.AutoWidth()
+				.HAlign(HAlign_Left)
+				.Padding(.5f, 1.f)
+				[
+					GenerateValueWidget(WidgetRowData.PropertyInstanceInfo)
+				]
+			);
+#else
 		WidgetRowData.ValueWidgetContainer->GetSlot(0)
 			[
 				GenerateValueWidget(WidgetRowData.PropertyInstanceInfo)
 			];
+#endif
 	}
 }
 
