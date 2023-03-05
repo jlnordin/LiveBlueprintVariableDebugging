@@ -9,7 +9,6 @@
 #include "DetailWidgetRow.h"
 #include "IDetailGroup.h"
 #include "Brushes/SlateColorBrush.h"
-#include "Debugging/SKismetDebugTreeView.h"
 #include "Kismet2/KismetDebugUtilities.h"
 #include "LiveBlueprintDebugger.h"
 #include "LiveBlueprintDebuggerSettings.h"
@@ -523,18 +522,4 @@ FString FLiveBlueprintDebuggerDetailCustomization::GetPropertyCategoryString(FPr
     }
 
     return Category;
-}
-
-TArray<FDebugTreeItemPtr> FLiveBlueprintDebuggerDetailCustomization::GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor)
-{
-	TArray<FDebugTreeItemPtr> PropertyDebugTreeItems;
-
-	FDebugTreeItemPtr RootDebugTreeItem = SKismetDebugTreeView::MakeParentItem(Actor);
-	RootDebugTreeItem->GatherChildrenBase(PropertyDebugTreeItems, FString());
-	FDebugTreeItemPtr SelfNode = PropertyDebugTreeItems[0];
-
-	PropertyDebugTreeItems.Reset();
-	SelfNode->GatherChildrenBase(PropertyDebugTreeItems, FString());
-
-	return PropertyDebugTreeItems;
 }

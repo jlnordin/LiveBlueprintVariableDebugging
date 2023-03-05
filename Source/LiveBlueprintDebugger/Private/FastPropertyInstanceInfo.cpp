@@ -21,9 +21,25 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 	PopulateText();
 }
 
+#if ENGINE_MAJOR_VERSION == 4
+
 FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 	void* ValuePointer,
-	TSharedPtr<FPropertyInstanceInfo>& PropertyInstanceInfo) :
+	const FProperty* Property,
+	FDebugInfo& DebugInfo) :
+		ValuePointer(ValuePointer),
+		Property(Property),
+		DisplayNameText(DebugInfo.DisplayName),
+		ValueText(DebugInfo.Value),
+		TypeText(DebugInfo.Type)
+{
+}
+
+#else
+
+FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
+	void* ValuePointer,
+	TSharedPtr<FPropertyInstanceInfo>&PropertyInstanceInfo) :
 		ValuePointer(ValuePointer),
 		Property(PropertyInstanceInfo->Property),
 		DisplayNameText(PropertyInstanceInfo->DisplayName),
@@ -31,8 +47,9 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 		TypeText(PropertyInstanceInfo->Type),
 		Object(PropertyInstanceInfo->Object)
 {
-
 }
+
+#endif
 
 const TFieldPath<const FProperty>& FFastPropertyInstanceInfo::GetProperty() const
 {
@@ -89,9 +106,15 @@ uint32 FFastPropertyInstanceInfo::GetValueHash() const
 	{
 		for (auto& Child : Children)
 		{
+#if ENGINE_MAJOR_VERSION == 4
+			ValueHash = HashCombine(
+				ValueHash,
+				Child.GetValueHash());
+#else
 			ValueHash = HashCombineFast(
 				ValueHash,
 				Child.GetValueHash());
+#endif
 		}
 	}
 	else if (Property->IsA<FInterfaceProperty>())
@@ -140,6 +163,77 @@ bool FFastPropertyInstanceInfo::ShouldExpandProperty(FFastPropertyInstanceInfo& 
 		PropertyInstanceInfo.GetProperty()->IsA<FStructProperty>() &&
 		PropertyInstanceInfo.GetProperty()->HasAllPropertyFlags(CPF_BlueprintVisible));
 }
+
+#if ENGINE_MAJOR_VERSION == 4
+
+static FText GetEnumValueText(UEnum* Enum, int64 Value)
+{
+	if (Enum != nullptr)
+	{
+		if (Enum->IsValidEnumValue(Value))
+		{
+			return Enum->GetDisplayNameTextByValue(Value);
+		}
+		else
+		{
+			return LOCTEXT("Invalid", "(INVALID)");
+		}
+	}
+	else
+	{
+		return FText::AsNumber(Value);
+	}
+}
+
+FText FFastPropertyInstanceInfo::GetPropertyValueText_UE4(const FProperty* Property, const void* PropertyValue)
+{
+	if (Property == nullptr)
+	{
+		return LOCTEXT("Invalid", "(INVALID)");
+	}
+
+	if (auto EnumProperty = CastField<FEnumProperty>(Property); EnumProperty != nullptr)
+	{
+		FNumericProperty* UnderlyingProperty = EnumProperty->GetUnderlyingProperty();
+		int64 Value = UnderlyingProperty->GetSignedIntPropertyValue(PropertyValue);
+		UEnum* Enum = EnumProperty->GetEnum();
+
+		return GetEnumValueText(Enum, Value);
+	}
+	else if (auto NumericProperty = CastField<FNumericProperty>(Property); NumericProperty != nullptr)
+	{
+		if (auto Enum = NumericProperty->GetIntPropertyEnum(); Enum != nullptr)
+		{
+			return GetEnumValueText(Enum, static_cast<int64>(*static_cast<const uint8*>(PropertyValue)));
+		}
+		else
+		{
+			return FText::FromString(NumericProperty->GetNumericPropertyValueToString(PropertyValue));
+		}
+	}
+	else if (auto BoolProperty = CastField<FBoolProperty>(Property); BoolProperty != nullptr)
+	{
+		return BoolProperty->GetPropertyValue(PropertyValue) ? FCoreTexts::Get().True : FCoreTexts::Get().False;
+	}
+	else if (auto NameProperty = CastField<FNameProperty>(Property); NameProperty != nullptr)
+	{
+		return FText::FromName(*(FName*)PropertyValue);
+	}
+	else if (auto TextProperty = CastField<FTextProperty>(Property); TextProperty != nullptr)
+	{
+		return TextProperty->GetPropertyValue(PropertyValue);
+	}
+	else if (auto StringProperty = CastField<FStrProperty>(Property); StringProperty != nullptr)
+	{
+		return FText::FromString(StringProperty->GetPropertyValue(PropertyValue));
+	}
+	else
+	{
+		return Property->GetClass()->GetDisplayNameText();
+	}
+}
+
+#endif
 
 void FFastPropertyInstanceInfo::PopulateObject()
 {
@@ -236,10 +330,15 @@ void FFastPropertyInstanceInfo::PopulateText()
 	}
 	else
 	{
+#if ENGINE_MAJOR_VERSION == 4
+		ValueText = GetPropertyValueText_UE4(*Property, ValuePointer);
+#else
 		// Here we _do_ make use of FKismetDebugUtilities::GetDebugInfoInternal to get the 
 		// information we need because we know this is _not_ an unbounded property type that might have
 		// hundreds of nested references. That is, this is not an object, interface, or struct.
-		
+		//
+		// (Note that this function only became publically accessible in UE 5.)
+
 		TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 		FKismetDebugUtilities::GetDebugInfoInternal(
 			InstanceInfo,
@@ -249,6 +348,7 @@ void FFastPropertyInstanceInfo::PopulateText()
 		DisplayNameText = InstanceInfo->DisplayName;
 		ValueText = InstanceInfo->Value;
 		TypeText = InstanceInfo->Type;
+#endif
 	}
 }
 
@@ -270,6 +370,16 @@ void FFastPropertyInstanceInfo::PopulateChildren()
 		Property->IsA<FArrayProperty>() ||
 		Property->IsA<FMapProperty>())
 	{
+#if ENGINE_MAJOR_VERSION == 4
+		//FDebugInfo DebugInfo = {};
+		
+		// TODO: Fill in children of sets, arrays, and maps for UE 4.
+
+		//for (auto& Child : DebugInfo.Children)
+		//{
+			//Children.Add(FFastPropertyInstanceInfo{ Child.Property->ContainerPtrToValuePtr<void>(ValuePointer), nullptr, Child });
+		//}
+#else
 		TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 		FKismetDebugUtilities::GetDebugInfoInternal(
 			InstanceInfo,
@@ -280,5 +390,6 @@ void FFastPropertyInstanceInfo::PopulateChildren()
 		{
 			Children.Add(FFastPropertyInstanceInfo{ Child->Property->ContainerPtrToValuePtr<void>(ValuePointer), Child });
 		}
+#endif
 	}
 }

@@ -28,7 +28,6 @@ public class LiveBlueprintDebugger : ModuleRules
 			{
 				"Projects",
 				"InputCore",
-				"EditorFramework",
 				"UnrealEd",
 				"ToolMenus",
 				"CoreUObject",
@@ -50,5 +49,7 @@ public class LiveBlueprintDebugger : ModuleRules
                 "PropertyEditor"
 			}
 			);
+
+		CppStandard = CppStandardVersion.Cpp17;
 	}
 }

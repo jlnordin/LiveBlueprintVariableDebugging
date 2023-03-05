@@ -54,7 +54,6 @@ private:
 	static void UpdateWidgetRowValue(FLiveBlueprintWidgetRowData& WidgetRowData);
 	static void UpdateWidgetRow(FLiveBlueprintWidgetRowData& LiveBlueprintWidgetRow, double RealTimeInSeconds);
 	static FString GetPropertyCategoryString(FProperty* Property);
-	static TArray<TSharedPtr<class FDebugLineItem>> GetActorBlueprintPropertiesAsDebugTreeItemPtrs(AActor* Actor);
 
 	TWeakObjectPtr<AActor> Actor;
 	TArray<FLiveBlueprintWidgetRowData> WidgetRows;

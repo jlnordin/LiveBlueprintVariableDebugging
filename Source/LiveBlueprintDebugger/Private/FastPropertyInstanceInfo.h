@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 // FFastPropertyInstanceInfo provides debugging information for an FProperty. It is similar to the
 // FPropertyInstanceInfo class in KismetDebugUtilities.h but it explicitly stops property recursion
@@ -16,7 +17,12 @@ class FFastPropertyInstanceInfo
 {
 public:
 	FFastPropertyInstanceInfo(void* Container, const FProperty* Property);
+
+#if ENGINE_MAJOR_VERSION == 4
+	FFastPropertyInstanceInfo(void* ValuePointer, const FProperty* Property, struct FDebugInfo& DebugInfo);
+#else
 	FFastPropertyInstanceInfo(void* ValuePointer, TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+#endif
 
 	const TFieldPath<const FProperty>& GetProperty() const;
 	FText GetDisplayName() const;
@@ -31,6 +37,10 @@ public:
 	void Refresh();
 
 	static bool ShouldExpandProperty(FFastPropertyInstanceInfo& PropertyInstanceInfo);
+
+#if ENGINE_MAJOR_VERSION == 4
+	static FText GetPropertyValueText_UE4(const FProperty* Property, const void* PropertyValue);
+#endif
 
 private:
 	void PopulateObject();
