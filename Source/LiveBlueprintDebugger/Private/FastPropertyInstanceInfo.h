@@ -19,7 +19,8 @@ public:
 	FFastPropertyInstanceInfo(void* Container, const FProperty* Property);
 
 #if ENGINE_MAJOR_VERSION == 4
-	FFastPropertyInstanceInfo(void* ValuePointer, const FProperty* Property, struct FDebugInfo& DebugInfo);
+	struct value_pointer_marker {};
+	FFastPropertyInstanceInfo(void* ValuePointer, const FProperty* Property, value_pointer_marker);
 #else
 	FFastPropertyInstanceInfo(void* ValuePointer, TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 #endif

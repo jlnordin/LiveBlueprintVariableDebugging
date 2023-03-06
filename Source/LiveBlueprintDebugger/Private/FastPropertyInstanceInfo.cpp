@@ -24,15 +24,15 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 #if ENGINE_MAJOR_VERSION == 4
 
 FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
-	void* ValuePointer,
-	const FProperty* Property,
-	FDebugInfo& DebugInfo) :
+	void* ValuePointer, 
+	const FProperty* Property, 
+	value_pointer_marker) :
 		ValuePointer(ValuePointer),
-		Property(Property),
-		DisplayNameText(DebugInfo.DisplayName),
-		ValueText(DebugInfo.Value),
-		TypeText(DebugInfo.Type)
+		Property(Property)
 {
+	PopulateChildren();
+	PopulateObject();
+	PopulateText();
 }
 
 #else
@@ -128,7 +128,15 @@ uint32 FFastPropertyInstanceInfo::GetValueHash() const
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
 	{
+#if ENGINE_MAJOR_VERSION == 4
+		// Unreal Engine 4 has issues with the generic GetValueTypeHash function, so we will instead 
+		// calculate the hash of the value text using the standard library.
+		FString ValueString = ValueText.ToString();
+		std::hash<std::wstring_view> Hasher;
+		ValueHash = Hasher({ *ValueString, static_cast<size_t>(ValueString.Len()) });
+#else
 		ValueHash = Property->GetValueTypeHash(ValuePointer);
+#endif
 	}
 
 	return ValueHash;
@@ -371,14 +379,56 @@ void FFastPropertyInstanceInfo::PopulateChildren()
 		Property->IsA<FMapProperty>())
 	{
 #if ENGINE_MAJOR_VERSION == 4
-		//FDebugInfo DebugInfo = {};
-		
-		// TODO: Fill in children of sets, arrays, and maps for UE 4.
 
-		//for (auto& Child : DebugInfo.Children)
-		//{
-			//Children.Add(FFastPropertyInstanceInfo{ Child.Property->ContainerPtrToValuePtr<void>(ValuePointer), nullptr, Child });
-		//}
+		if (auto ArrayProperty = CastField<FArrayProperty>(Property.Get()); ArrayProperty != nullptr)
+		{
+			FScriptArrayHelper ArrayHelper{ ArrayProperty, ValuePointer };
+			
+			for (int i = 0; i < ArrayHelper.Num(); i++)
+			{
+				Children.Add(FFastPropertyInstanceInfo{
+					ArrayHelper.GetRawPtr(i),
+					ArrayProperty->Inner,
+					FFastPropertyInstanceInfo::value_pointer_marker{}});
+			}
+		}
+		else if (auto MapProperty = CastField<FMapProperty>(Property.Get()); MapProperty != nullptr)
+		{
+			FScriptMapHelper MapHelper{ MapProperty, ValuePointer };
+
+			for (int i = 0; i < MapHelper.Num(); i++)
+			{
+				FFastPropertyInstanceInfo KeyInfo{
+					MapHelper.GetKeyPtr(i),
+					MapHelper.GetKeyProperty(),
+					FFastPropertyInstanceInfo::value_pointer_marker{} };
+
+				FFastPropertyInstanceInfo ValueInfo{
+					MapHelper.GetValuePtr(i),
+					MapHelper.GetValueProperty(),
+					FFastPropertyInstanceInfo::value_pointer_marker{} };
+
+				ValueInfo.DisplayNameText = FText::Format(
+					FTextFormat::FromString(TEXT("[\"{0}\"] ")),
+					{ 
+						KeyInfo.GetValue()
+					});
+
+				Children.Add(ValueInfo);
+			}
+		}
+		else if (auto SetProperty = CastField<FSetProperty>(Property.Get()); SetProperty != nullptr)
+		{
+			FScriptSetHelper SetHelper{ SetProperty, ValuePointer };
+
+			for (int i = 0; i < SetHelper.Num(); i++)
+			{
+				Children.Add(FFastPropertyInstanceInfo{
+					SetHelper.GetElementPtr(i),
+					SetHelper.GetElementProperty(),
+					FFastPropertyInstanceInfo::value_pointer_marker{} });
+			}
+		}
 #else
 		TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 		FKismetDebugUtilities::GetDebugInfoInternal(
