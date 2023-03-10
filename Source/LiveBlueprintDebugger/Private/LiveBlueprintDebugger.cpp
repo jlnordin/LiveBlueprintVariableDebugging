@@ -21,10 +21,50 @@ void FLiveBlueprintDebuggerModule::StartupModule()
 			CurrentDetailCustomization.Reset();
 			CurrentDetailCustomization = FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(DetailBuilder);
 		});
+
+	PIEStartingDelegateHandle = FEditorDelegates::PreBeginPIE.AddLambda(
+		[this](bool)
+		{
+			if (CurrentDetailCustomization != nullptr)
+			{
+				CurrentDetailCustomization->SaveSelectedActor();
+			}
+		});
+
+	PIEStartedDelegateHandle = FEditorDelegates::PostPIEStarted.AddLambda(
+		[this](bool) 
+		{
+			if (CurrentDetailCustomization != nullptr)
+			{
+				CurrentDetailCustomization->ReselectActor();
+			}
+		});
+
+	OnPreSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnPreSwitchBeginPIEAndSIE.AddLambda(
+		[this](bool)
+		{
+			if (CurrentDetailCustomization != nullptr)
+			{
+				CurrentDetailCustomization->SaveSelectedActor();
+			}
+		});
+
+	OnSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnSwitchBeginPIEAndSIE.AddLambda(
+		[this](bool)
+		{
+			if (CurrentDetailCustomization != nullptr)
+			{
+				CurrentDetailCustomization->ReselectActor();
+			}
+		});
 }
 
 void FLiveBlueprintDebuggerModule::ShutdownModule()
 {
+	FEditorDelegates::OnSwitchBeginPIEAndSIE.Remove(OnSwitchBeginPIEAndSIEDelegateHandle);
+	FEditorDelegates::OnPreSwitchBeginPIEAndSIE.Remove(OnPreSwitchBeginPIEAndSIEDelegateHandle);
+	FEditorDelegates::PostPIEStarted.Remove(PIEStartedDelegateHandle);
+	FEditorDelegates::PreBeginPIE.Remove(PIEStartingDelegateHandle);
 	OnExtendActorDetails.Remove(DetailCustomizationDelegateHandle);
 	DetailCustomizationDelegateHandle.Reset();
 	CurrentDetailCustomization.Reset();

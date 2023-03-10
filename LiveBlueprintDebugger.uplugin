@@ -16,7 +16,7 @@
 	"IsExperimentalVersion": false,
 	"Installed": false,
 	"Modules": [
-		{
+		{ 
 			"Name": "LiveBlueprintDebugger",
 			"Type": "Editor",
 			"LoadingPhase": "Default",

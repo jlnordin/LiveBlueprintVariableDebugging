@@ -231,6 +231,27 @@ FLiveBlueprintDebuggerDetailCustomization::~FLiveBlueprintDebuggerDetailCustomiz
 	}
 }
 
+void FLiveBlueprintDebuggerDetailCustomization::SaveSelectedActor()
+{
+	ActorToReselect.Reset();
+
+	if (GEditor->GetSelectedActorCount() == 1)
+	{
+		ActorToReselect = GEditor->GetSelectedActors()->GetTop<AActor>();
+	}
+}
+
+void FLiveBlueprintDebuggerDetailCustomization::ReselectActor()
+{
+	AActor* ResolvedActor = ActorToReselect.Get();
+
+	if (ResolvedActor != nullptr)
+	{
+		GEditor->SelectNone(true, true);
+		GEditor->SelectActor(ResolvedActor, true, true);
+	}
+}
+
 void FLiveBlueprintDebuggerDetailCustomization::UpdateBlueprintDetails()
 {
 	if (!Actor.IsValid())

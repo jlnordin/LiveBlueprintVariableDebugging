@@ -38,6 +38,9 @@ private:
 	FLiveBlueprintDebuggerDetailCustomization(TWeakObjectPtr<AActor> ActorToCustomize, IDetailLayoutBuilder& LayoutBuilder);
 public:
 	~FLiveBlueprintDebuggerDetailCustomization();
+
+	void SaveSelectedActor();
+	void ReselectActor();
 	
 private:
 	void UpdateBlueprintDetails();
@@ -60,4 +63,5 @@ private:
 	FTimerHandle UpdateTimerHandle;
 	TSharedPtr<class SKismetDebugTreeView> DebugTreeWidget;
 	TSharedPtr<class FDebugLineItem> RootDebugTreeItem;
+	TWeakObjectPtr<AActor> ActorToReselect;
 };
