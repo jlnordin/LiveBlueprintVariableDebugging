@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0",
+	"Version": 1001,
+	"VersionName": "1.1",
 	"FriendlyName": "Live Blueprint Debugger in Actor Details",
 	"Description": "Shows a live Blueprint debugger in the actor details panel when playing or simulating in the editor.",
 	"Category": "Debugging",

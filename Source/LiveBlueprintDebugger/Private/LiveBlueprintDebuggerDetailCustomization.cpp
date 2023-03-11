@@ -233,6 +233,13 @@ FLiveBlueprintDebuggerDetailCustomization::~FLiveBlueprintDebuggerDetailCustomiz
 
 void FLiveBlueprintDebuggerDetailCustomization::SaveSelectedActor()
 {
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
+	
+	if (!Settings->bKeepActorSelected)
+	{
+		return;
+	}
+
 	ActorToReselect.Reset();
 
 	if (GEditor->GetSelectedActorCount() == 1)
@@ -243,6 +250,13 @@ void FLiveBlueprintDebuggerDetailCustomization::SaveSelectedActor()
 
 void FLiveBlueprintDebuggerDetailCustomization::ReselectActor()
 {
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
+
+	if (!Settings->bKeepActorSelected)
+	{
+		return;
+	}
+
 	AActor* ResolvedActor = ActorToReselect.Get();
 
 	if (ResolvedActor != nullptr)

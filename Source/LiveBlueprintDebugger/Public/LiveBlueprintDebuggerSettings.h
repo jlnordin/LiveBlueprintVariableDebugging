@@ -61,4 +61,7 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
 	FLinearColor PropertyChangedHighlightColor = FLinearColor(0.0f, 1.0f, 0.0f, 0.6f);
+
+	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger", DisplayName = "Keep actor selected when playing in editor, ejecting, and possessing.")
+	bool bKeepActorSelected = false;
 };

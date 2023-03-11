@@ -33,7 +33,7 @@ The Live Blueprint Debugger settings can be found in `Edit` -> `Project Settings
 ### Setting - Highlight Values That Have Changed
 Setting this to true will show a one-second highlight animation around a Blueprint variable in the details panel when its value changes.
 
-### Property Refresh Rate
+### Setting - Property Refresh Rate
 
 `No Live Updates` - Blueprint variable values will only be updated when first selecting an Actor.
 
@@ -43,9 +43,13 @@ Setting this to true will show a one-second highlight animation around a Bluepri
 
 `30Hz` - Blueprint variables will be refreshed 30 times per second.
 
-### Property Changed Highlight Color
+### Setting - Property Changed Highlight Color
 This will control the highlight color in the UI when a Blueprint variable value changes if live updates are enabled. The default is green at 60% opacity.
+
+### Setting - Keep Actor Selected
+Setting this to true will keep the current actor selected when entering play-in-editor mode. This will also keep the actor selected when ejecting or possessing the player pawn when testing the level. Note that this will only work with actors that have Blueprint details and only if a single actor is selected.
 
 ## Notes
 
-The Live Blueprint Editor will create a category for public Blueprint variables under the category `Blueprint Properties - Public`. These variables are also included by default in the details panel under the category `Public`. Only the `Blueprint Properties - Public` category supports live updates, `Public` does not.
+- The Live Blueprint Editor will create a category for public Blueprint variables under the category `Blueprint Properties - Public`. These variables are also included by default in the details panel under the category `Public`. Only the `Blueprint Properties - Public` category supports live updates, `Public` does not.
+- For Unreal Engine 4.27, detail sections do not exist, so there is no `Blueprint` section, but the individual categories will still show up as `Blueprint Properties - [category]` in the details panel.

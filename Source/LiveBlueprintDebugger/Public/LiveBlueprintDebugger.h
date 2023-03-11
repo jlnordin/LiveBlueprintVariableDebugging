@@ -21,8 +21,8 @@ public:
 
 private:
 	FDelegateHandle DetailCustomizationDelegateHandle;
-	FDelegateHandle PIEStartedDelegateHandle;
-	FDelegateHandle PIEStartingDelegateHandle;
+	FDelegateHandle PreBeginPIEDelegateHandle;
+	FDelegateHandle PostPIEStartedDelegateHandle;
 	FDelegateHandle OnPreSwitchBeginPIEAndSIEDelegateHandle;
 	FDelegateHandle OnSwitchBeginPIEAndSIEDelegateHandle;
 	TUniquePtr<class FLiveBlueprintDebuggerDetailCustomization> CurrentDetailCustomization;
