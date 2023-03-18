@@ -39,7 +39,7 @@ TUniquePtr<FLiveBlueprintDebuggerDetailCustomization> FLiveBlueprintDebuggerDeta
 	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
 
 	if ((Settings->WhenToShowVariables == EShowBlueprintVariables::OnlyWhenPlayingOrSimulating) &&
-		(Actor->GetWorld()->WorldType != EWorldType::PIE))
+		!(GEditor->IsPlaySessionInProgress()))
 	{
 		UE_LOG(
 			LogLiveBlueprintDebugger,
@@ -228,41 +228,6 @@ FLiveBlueprintDebuggerDetailCustomization::~FLiveBlueprintDebuggerDetailCustomiz
 	if (Actor.IsValid() && UpdateTimerHandle.IsValid())
 	{
 		Actor->GetWorldTimerManager().ClearTimer(UpdateTimerHandle);
-	}
-}
-
-void FLiveBlueprintDebuggerDetailCustomization::SaveSelectedActor()
-{
-	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
-	
-	if (!Settings->bKeepActorSelected)
-	{
-		return;
-	}
-
-	ActorToReselect.Reset();
-
-	if (GEditor->GetSelectedActorCount() == 1)
-	{
-		ActorToReselect = GEditor->GetSelectedActors()->GetTop<AActor>();
-	}
-}
-
-void FLiveBlueprintDebuggerDetailCustomization::ReselectActor()
-{
-	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
-
-	if (!Settings->bKeepActorSelected)
-	{
-		return;
-	}
-
-	AActor* ResolvedActor = ActorToReselect.Get();
-
-	if (ResolvedActor != nullptr)
-	{
-		GEditor->SelectNone(true, true);
-		GEditor->SelectActor(ResolvedActor, true, true);
 	}
 }
 

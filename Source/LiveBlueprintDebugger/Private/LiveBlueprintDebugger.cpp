@@ -2,8 +2,10 @@
 
 #include "LiveBlueprintDebugger.h"
 #include "LiveBlueprintDebuggerDetailCustomization.h"
+#include "LiveBlueprintDebuggerSettings.h"
 
 #include "ActorDetailsDelegates.h"
+#include "Editor.h"
 #include "LevelEditor.h"
 #include "PropertyEditorModule.h"
 
@@ -22,41 +24,17 @@ void FLiveBlueprintDebuggerModule::StartupModule()
 			CurrentDetailCustomization = FLiveBlueprintDebuggerDetailCustomization::CreateForLayoutBuilder(DetailBuilder);
 		});
 
-	PreBeginPIEDelegateHandle = FEditorDelegates::PreBeginPIE.AddLambda(
-		[this](bool)
-		{
-			if (CurrentDetailCustomization != nullptr)
-			{
-				CurrentDetailCustomization->SaveSelectedActor();
-			}
-		});
+	PreBeginPIEDelegateHandle = FEditorDelegates::PreBeginPIE.AddRaw(
+		this, &FLiveBlueprintDebuggerModule::SaveSelectedActor);
 
-	PostPIEStartedDelegateHandle = FEditorDelegates::PostPIEStarted.AddLambda(
-		[this](bool) 
-		{
-			if (CurrentDetailCustomization != nullptr)
-			{
-				CurrentDetailCustomization->ReselectActor();
-			}
-		});
+	PostPIEStartedDelegateHandle = FEditorDelegates::PostPIEStarted.AddRaw(
+		this, &FLiveBlueprintDebuggerModule::ReselectActor);
 
-	OnPreSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnPreSwitchBeginPIEAndSIE.AddLambda(
-		[this](bool)
-		{
-			if (CurrentDetailCustomization != nullptr)
-			{
-				CurrentDetailCustomization->SaveSelectedActor();
-			}
-		});
+	OnPreSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnPreSwitchBeginPIEAndSIE.AddRaw(
+		this, &FLiveBlueprintDebuggerModule::SaveSelectedActor);
 
-	OnSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnSwitchBeginPIEAndSIE.AddLambda(
-		[this](bool)
-		{
-			if (CurrentDetailCustomization != nullptr)
-			{
-				CurrentDetailCustomization->ReselectActor();
-			}
-		});
+	OnSwitchBeginPIEAndSIEDelegateHandle = FEditorDelegates::OnSwitchBeginPIEAndSIE.AddRaw(
+		this, &FLiveBlueprintDebuggerModule::ReselectActor);
 }
 
 void FLiveBlueprintDebuggerModule::ShutdownModule()
@@ -68,6 +46,41 @@ void FLiveBlueprintDebuggerModule::ShutdownModule()
 	OnExtendActorDetails.Remove(DetailCustomizationDelegateHandle);
 	DetailCustomizationDelegateHandle.Reset();
 	CurrentDetailCustomization.Reset();
+}
+
+void FLiveBlueprintDebuggerModule::SaveSelectedActor(bool bIsSimulating)
+{
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
+
+	if (!Settings->bKeepActorSelected)
+	{
+		return;
+	}
+	
+	ActorToReselect.Reset();
+	
+	if (GEditor->GetSelectedActorCount() == 1)
+	{
+		ActorToReselect = GEditor->GetSelectedActors()->GetTop<AActor>();
+	}
+}
+
+void FLiveBlueprintDebuggerModule::ReselectActor(bool bIsSimulating)
+{
+	const ULiveBlueprintDebuggerSettings* Settings = GetDefault<ULiveBlueprintDebuggerSettings>();
+
+	if (!Settings->bKeepActorSelected)
+	{
+		return;
+	}
+
+	AActor* ResolvedActor = ActorToReselect.Get();
+
+	if (ResolvedActor != nullptr)
+	{
+		GEditor->SelectNone(true, true);
+		GEditor->SelectActor(ResolvedActor, true, true);
+	}
 }
 
 #undef LOCTEXT_NAMESPACE

@@ -20,10 +20,14 @@ public:
 	virtual void ShutdownModule() override;
 
 private:
+	void SaveSelectedActor(bool bIsSimulating);
+	void ReselectActor(bool bIsSimulating);
+
 	FDelegateHandle DetailCustomizationDelegateHandle;
 	FDelegateHandle PreBeginPIEDelegateHandle;
 	FDelegateHandle PostPIEStartedDelegateHandle;
 	FDelegateHandle OnPreSwitchBeginPIEAndSIEDelegateHandle;
 	FDelegateHandle OnSwitchBeginPIEAndSIEDelegateHandle;
 	TUniquePtr<class FLiveBlueprintDebuggerDetailCustomization> CurrentDetailCustomization;
+	TWeakObjectPtr<AActor> ActorToReselect;
 };
