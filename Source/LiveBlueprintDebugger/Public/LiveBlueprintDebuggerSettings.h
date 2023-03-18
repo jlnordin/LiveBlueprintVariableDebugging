@@ -54,12 +54,12 @@ public:
 	EShowBlueprintVariables WhenToShowVariables = EShowBlueprintVariables::OnlyWhenPlayingOrSimulating;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
-	bool bHighlightValuesThatHaveChanged = true;
-
-	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
 	EPropertyRefreshRate PropertyRefreshRate = EPropertyRefreshRate::Ten;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger")
+	bool bHighlightValuesThatHaveChanged = true;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger", meta=(EditCondition="bHighlightValuesThatHaveChanged"))
 	FLinearColor PropertyChangedHighlightColor = FLinearColor(0.0f, 1.0f, 0.0f, 0.6f);
 
 	UPROPERTY(Config, EditAnywhere, Category = "Live Blueprint Debugger", DisplayName = "Keep actor selected when playing in editor, ejecting, and possessing.")
