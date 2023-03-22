@@ -128,9 +128,9 @@ uint32 FFastPropertyInstanceInfo::GetValueHash() const
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
 	{
-#if ENGINE_MAJOR_VERSION == 4
-		// Unreal Engine 4 has issues with the generic GetValueTypeHash function, so we will instead 
-		// calculate the hash of the value text using the standard library.
+#if (ENGINE_MAJOR_VERSION == 4) || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION == 0)
+		// Unreal Engine 4.27 and 5.0 have issues with the generic GetValueTypeHash function, so we will 
+		// instead calculate the hash of the value text using the standard library.
 		FString ValueString = ValueText.ToString();
 		std::hash<std::wstring_view> Hasher;
 		ValueHash = Hasher({ *ValueString, static_cast<size_t>(ValueString.Len()) });
