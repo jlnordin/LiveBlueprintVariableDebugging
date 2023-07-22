@@ -39,7 +39,7 @@ FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 
 FFastPropertyInstanceInfo::FFastPropertyInstanceInfo(
 	void* ValuePointer,
-	TSharedPtr<FPropertyInstanceInfo>&PropertyInstanceInfo) :
+	const TSharedPtr<FPropertyInstanceInfo>&PropertyInstanceInfo) :
 		ValuePointer(ValuePointer),
 		Property(PropertyInstanceInfo->Property),
 		DisplayNameText(PropertyInstanceInfo->DisplayName),
@@ -128,15 +128,12 @@ uint32 FFastPropertyInstanceInfo::GetValueHash() const
 	}
 	else if ((Property->PropertyFlags & CPF_HasGetValueTypeHash))
 	{
-#if (ENGINE_MAJOR_VERSION == 4) || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION == 0)
-		// Unreal Engine 4.27 and 5.0 have issues with the generic GetValueTypeHash function, so we will 
-		// instead calculate the hash of the value text using the standard library.
+		// Unreal Engine 4.27, 5.0, and 5.2 have issues with the generic GetValueTypeHash function, so we
+		// will instead calculate the hash of the value text using the standard library. Strangely, 
+		// GetValueTypeHash work fine in Unreal Engine 5.1, but this STL method works in all cases.
 		FString ValueString = ValueText.ToString();
 		std::hash<std::wstring_view> Hasher;
 		ValueHash = Hasher({ *ValueString, static_cast<size_t>(ValueString.Len()) });
-#else
-		ValueHash = Property->GetValueTypeHash(ValuePointer);
-#endif
 	}
 
 	return ValueHash;
@@ -429,14 +426,18 @@ void FFastPropertyInstanceInfo::PopulateChildren()
 					FFastPropertyInstanceInfo::value_pointer_marker{} });
 			}
 		}
-#else
+#elif ENGINE_MAJOR_VERSION == 5
 		TSharedPtr<FPropertyInstanceInfo> InstanceInfo;
 		FKismetDebugUtilities::GetDebugInfoInternal(
 			InstanceInfo,
 			*Property,
 			ValuePointer);
 
+#if ENGINE_MINOR_VERSION >= 2
+		for (auto& Child : InstanceInfo->GetChildren())
+#else
 		for (auto& Child : InstanceInfo->Children)
+#endif
 		{
 			Children.Add(FFastPropertyInstanceInfo{ Child->Property->ContainerPtrToValuePtr<void>(ValuePointer), Child });
 		}

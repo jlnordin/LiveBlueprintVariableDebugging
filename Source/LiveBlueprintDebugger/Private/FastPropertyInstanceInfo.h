@@ -22,7 +22,7 @@ public:
 	struct value_pointer_marker {};
 	FFastPropertyInstanceInfo(void* ValuePointer, const FProperty* Property, value_pointer_marker);
 #else
-	FFastPropertyInstanceInfo(void* ValuePointer, TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
+	FFastPropertyInstanceInfo(void* ValuePointer, const TSharedPtr<struct FPropertyInstanceInfo>& PropertyInstanceInfo);
 #endif
 
 	const TFieldPath<const FProperty>& GetProperty() const;
