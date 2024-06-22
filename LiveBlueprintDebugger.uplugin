@@ -10,7 +10,7 @@
 	"DocsURL": "https://github.com/jlnordin/LiveBlueprintVariableDebugging/blob/main/README.md",
 	"SupportURL": "https://github.com/jlnordin/LiveBlueprintVariableDebugging/issues",
 	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/6019cfbf80bb4942add3b61d9180380a",
-	"EngineVersion": "5.3.0",
+	"EngineVersion": "5.4.0",
 	"CanContainContent": false,
 	"IsBetaVersion": false,
 	"IsExperimentalVersion": false,
