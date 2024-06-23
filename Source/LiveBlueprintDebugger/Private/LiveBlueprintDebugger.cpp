@@ -8,6 +8,7 @@
 #include "Editor.h"
 #include "LevelEditor.h"
 #include "PropertyEditorModule.h"
+#include "Selection.h"
 
 #define LOCTEXT_NAMESPACE "FLiveBlueprintDebuggerModule"
 
